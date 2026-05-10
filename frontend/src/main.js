@@ -106,8 +106,8 @@ document.querySelector('#app').innerHTML = `
     </div>
     <ul class="module-list" id="module-list">
         <li class="module-item" data-tool="yaml-converter"><span class="module-icon">Y</span><span class="module-label">YAML 转换</span></li>
-        <li class="module-item" data-tool="dddd-fingerprint-converter"><span class="module-icon">F</span><span class="module-label">dddd 指纹转换</span></li>
-        <li class="module-item" data-tool="poc-converter"><span class="module-icon">P</span><span class="module-label">dddd POC 转换</span></li>
+        <li class="module-item" data-tool="dddd-fingerprint-converter"><span class="module-icon">F</span><span class="module-label">指纹转换</span></li>
+        <li class="module-item" data-tool="poc-converter"><span class="module-icon">P</span><span class="module-label">POC 转换</span></li>
         <li class="module-item" data-tool="filename-extract"><span class="module-icon">N</span><span class="module-label">文件名提取</span></li>
         <li class="module-item" data-tool="nuclei-validator"><span class="module-icon">V</span><span class="module-label">Nuclei 验证</span></li>
         <li class="module-item" data-tool="template-dedup"><span class="module-icon">D</span><span class="module-label">模板去重</span></li>
@@ -2129,14 +2129,14 @@ function renderPocConverter(container) {
     container.innerHTML = `
     <div class="yaml-converter poc-converter">
         <div class="yaml-tip">
-            💡 <b>流程</b>: 加载 MD POC → 勾选 → <b>批量转换为 nuclei YAML</b> → 检查/微调 → <b>保存到 dddd pocs</b> → <b>验证 / 一键修复</b>
+            💡 <b>流程</b>: 加载 MD POC → 勾选 → <b>批量转换为 nuclei YAML</b> → 检查/微调 → <b>保存到目标 pocs</b> → <b>验证 / 一键修复</b>
             &nbsp;·&nbsp; 启发式从 MD 推断 id / severity / tags, 自动替换 Host 为 <code>{{Hostname}}</code>, matchers 给占位需人工补齐.
         </div>
         <div class="poc-dddd-card">
             <div class="nv-toolbar">
                 <input type="text" class="yaml-path-input" id="poc-dddd-root"
-                    placeholder="选择 dddd 根目录，输出目录可自动设为 common/config/pocs" spellcheck="false" />
-                <button class="btn" id="poc-dddd-pick">选择 dddd</button>
+                    placeholder="可选：选择目标项目目录，输出目录可自动设为 common/config/pocs" spellcheck="false" />
+                <button class="btn" id="poc-dddd-pick">选择目标项目</button>
                 <button class="btn" id="poc-dddd-use-pocs">输出到 pocs</button>
                 <button class="btn" id="poc-dddd-audit">关联审计</button>
             </div>
@@ -2323,7 +2323,7 @@ function setupPocConverter() {
         const root = elDdddRoot.value.trim();
         const target = ddddPocsDir(root);
         if (!target) {
-            toast('请先选择或粘贴 dddd 根目录', 'error');
+            toast('请先选择或粘贴目标项目目录', 'error');
             return;
         }
         pocState.targetFolder = target;
@@ -2333,7 +2333,7 @@ function setupPocConverter() {
         renderDdddHistory();
         renderTargetSummary();
         if (panelState.target) setPanelCollapsed('target', false);
-        toast('输出目录已设为 dddd common/config/pocs');
+        toast('输出目录已设为目标项目 common/config/pocs');
     });
     elDdddAudit.addEventListener('click', () => {
         const root = elDdddRoot.value.trim();
@@ -4778,7 +4778,7 @@ function renderFingerprintClassView(r) {
     const groups = parseDDDDYamlClasses(r && r.ddddYaml);
     const totalRules = groups.reduce((sum, g) => sum + g.rules.length, 0);
     if (groups.length === 0) {
-        return renderFingerprintSection('按指纹名归类展示', 0, '<div class="fg-empty">暂无可展示的 dddd 指纹</div>', 0);
+        return renderFingerprintSection('按指纹名归类展示', 0, '<div class="fg-empty">暂无可展示的指纹</div>', 0);
     }
     const shownGroups = groups.slice(0, 300);
     const nav = shownGroups.map((g, i) => `
@@ -4788,7 +4788,7 @@ function renderFingerprintClassView(r) {
         </a>`).join('');
     const cards = shownGroups.map((g, i) => {
         const shownRules = g.rules.slice(0, 200);
-        const more = g.rules.length > shownRules.length ? `\n... 另有 ${g.rules.length - shownRules.length} 条未展示，可复制 dddd YAML 查看完整内容` : '';
+        const more = g.rules.length > shownRules.length ? `\n... 另有 ${g.rules.length - shownRules.length} 条未展示，可复制 finger.yaml 查看完整内容` : '';
         return `
         <section class="fg-class-card" id="fg-class-${i}">
             <div class="fg-class-card-head">
@@ -4804,7 +4804,7 @@ function renderFingerprintClassView(r) {
             <div class="fg-class-cards">${cards}</div>
         </div>`;
     return renderFingerprintSection('按指纹名归类展示', groups.length, body, shownGroups.length)
-        .replace('</summary>', ` · <span>${escapeHtml(totalRules)} 条 dddd 可用表达式，预览限流展示</span></summary>`);
+        .replace('</summary>', ` · <span>${escapeHtml(totalRules)} 条 finger.yaml 可用表达式，预览限流展示</span></summary>`);
 }
 
 function looksLikeDDDDFingerprintSource(p) {
@@ -4834,29 +4834,29 @@ function renderDDDDFingerprintConverter(container) {
     container.innerHTML = `
     <div class="fingerprint-governance dddd-fingerprint-converter">
         <div class="extractor-tip">
-            🧬 选择指纹目录后转换为 dddd <code>finger.yaml</code> 可直接使用的格式，并按“指纹名 / 产品名”归类展示全部表达式。
+            🧬 选择待转换的第三方指纹目录，生成 <code>finger.yaml</code> 可直接使用的格式；目标项目目录是可选项，只在需要写回时使用。
         </div>
         <div class="fg-import-card">
             <div class="fg-import-head">
                 <div>
-                    <b>dddd 指纹转换与优化</b>
-                    <span>支持 YAML / JSON / TXT 等来源，自动归一化产品名、去重、评分、提示弱规则，并可备份后写回 dddd。</span>
+                    <b>指纹转换与优化</b>
+                    <span>支持 YAML / JSON / TXT 等来源，自动归一化产品名、去重、评分、提示弱规则，并可备份后写回目标项目。</span>
                 </div>
             </div>
             <div class="nv-toolbar">
-                <input type="text" class="yaml-path-input" id="df-root"
-                    placeholder="选择 dddd 根目录，写回目标为 common/config/finger.yaml；不填也可只做独立预览" spellcheck="false" />
-                <button class="btn" id="df-root-pick">选择 dddd</button>
-                <button class="btn" id="df-open-audit">关联审计</button>
-            </div>
-            <div class="nv-history" id="df-root-history"></div>
-            <div class="nv-toolbar">
                 <input type="text" class="yaml-path-input" id="df-src"
                     placeholder="选择待转换指纹目录，可包含 yaml / json / txt 等" spellcheck="false" />
-                <button class="btn" id="df-src-pick">选择指纹目录</button>
+                <button class="btn" id="df-src-pick">选择来源目录</button>
                 <button class="btn btn-primary" id="df-run">🔎 转换预览</button>
             </div>
             <div class="nv-history" id="df-src-history"></div>
+            <div class="nv-toolbar">
+                <input type="text" class="yaml-path-input" id="df-root"
+                    placeholder="可选：选择目标项目目录；写回目标为 common/config/finger.yaml，不填则只生成预览" spellcheck="false" />
+                <button class="btn" id="df-root-pick">选择目标项目</button>
+                <button class="btn" id="df-open-audit">关联审计</button>
+            </div>
+            <div class="nv-history" id="df-root-history"></div>
         </div>
         <div class="fg-import-summary" id="df-summary"></div>
         <div class="fg-import-result dddd-finger-result" id="df-result"></div>
@@ -4949,7 +4949,7 @@ function setupDDDDFingerprintConverter() {
         const text = btn.dataset.copy === 'yaml'
             ? (lastFingerprintImportPreview && lastFingerprintImportPreview.ddddYaml) || ''
             : (lastFingerprintImportPreview && lastFingerprintImportPreview.patchPreview) || '';
-        if (text) copyToClipboard(text, btn.dataset.copy === 'yaml' ? 'dddd YAML' : 'Patch 预览');
+        if (text) copyToClipboard(text, btn.dataset.copy === 'yaml' ? 'finger.yaml' : 'Patch 预览');
     });
 
     async function runPreview(sourceDir) {
@@ -4969,15 +4969,15 @@ function setupDDDDFingerprintConverter() {
             fingerGovState.importDir = sourceDir;
             saveFingerGovState(fingerGovState);
             renderHistories();
-            toast('检测到 dddd 根目录和指纹目录可能填反，已自动交换后继续转换', 'error');
+            toast('检测到目标项目目录和指纹来源目录可能填反，已自动交换后继续转换', 'error');
         }
         elRun.disabled = true;
         elSrcPick.disabled = true;
         const oldLabel = elRun.textContent;
         elRun.textContent = '⏳ 转换中…';
         elSummary.innerHTML = '';
-        elResult.innerHTML = `<div class="yaml-empty">正在解析 ${escapeHtml(sourceDir)} 并转换为 dddd 指纹表达式…</div>`;
-        progressTracker.start('fingerprint:import:progress', 'dddd 指纹转换预览');
+        elResult.innerHTML = `<div class="yaml-empty">正在解析 ${escapeHtml(sourceDir)} 并转换为 finger.yaml 指纹表达式…</div>`;
+        progressTracker.start('fingerprint:import:progress', '指纹转换预览');
         try {
             const r = await PreviewFingerprintImport(root, sourceDir);
             lastFingerprintImportPreview = r;
@@ -5004,7 +5004,7 @@ function setupDDDDFingerprintConverter() {
             return;
         }
         if (!projectRoot) {
-            toast('请先选择 dddd 根目录', 'error');
+            toast('请先选择目标项目目录后再写回', 'error');
             return;
         }
         const input = elResult.querySelector('#fg-import-confirm');
@@ -5216,7 +5216,7 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
         </div>
         <div class="fg-paths">
             <div><b>source:</b> <code>${escapeHtml(r.sourceDir || '')}</code></div>
-            <div><b>target:</b> <code>${escapeHtml(r.targetFingerPath || '未选择 dddd 根目录，仅生成独立预览')}</code></div>
+            <div><b>target:</b> <code>${escapeHtml(r.targetFingerPath || '未选择目标项目目录，仅生成独立预览')}</code></div>
         </div>`;
 
     const itemRows = (r.items || []).map((x) => {
@@ -5252,7 +5252,7 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
     const patchPreview = patchText.length > 120000 ? patchText.slice(0, 120000) + '\n... (预览已截断，复制按钮仍复制完整 Patch)' : patchText;
     const yamlBlock = `
         <details class="fg-section fg-code-section" ${yamlText.length > 200000 ? '' : 'open'}>
-            <summary>dddd YAML 预览 <span>${escapeHtml(yamlText.split('\n').filter(Boolean).length)} 行${yamlText.length > yamlPreview.length ? ' · 已截断展示' : ''}</span></summary>
+            <summary>finger.yaml 预览 <span>${escapeHtml(yamlText.split('\n').filter(Boolean).length)} 行${yamlText.length > yamlPreview.length ? ' · 已截断展示' : ''}</span></summary>
             <div class="fg-code-actions"><button class="fg-reveal" data-copy="yaml">复制 YAML</button></div>
             <pre id="fg-import-yaml" class="fg-code">${escapeHtml(yamlPreview)}</pre>
         </details>`;
@@ -5365,8 +5365,8 @@ const routes = {
     'yaml-collect':      { module: '辅助模块', name: 'YAML 采集',    render: renderYamlCollect     },
     'fingerprint-governance': { module: '辅助模块', name: '指纹治理', render: renderFingerprintGovernance },
     'yaml-converter':    { module: '转换模块', name: 'YAML 转换',    render: renderYamlConverter   },
-    'dddd-fingerprint-converter': { module: '转换模块', name: 'dddd 指纹转换', render: renderDDDDFingerprintConverter },
-    'poc-converter':     { module: '转换模块', name: 'dddd POC 转换', render: renderPocConverter    },
+    'dddd-fingerprint-converter': { module: '转换模块', name: '指纹转换', render: renderDDDDFingerprintConverter },
+    'poc-converter':     { module: '转换模块', name: 'POC 转换', render: renderPocConverter    },
 };
 
 const moduleByTool = {
