@@ -5339,14 +5339,14 @@ function renderFingerprintAudit(r, elSummary, elResult) {
             ${stat('POC 有指纹且可调用', r.pocWithFingerWorkflowCount || 0, (r.pocWithFingerWorkflowCount || 0) ? 'fg-good' : '')}
             ${stat('指纹无 POC', r.fingerWithoutPocCount || 0, (r.fingerWithoutPocCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('POC 有指纹未进 Workflow', r.pocWithFingerNoWorkflowCount || 0, (r.pocWithFingerNoWorkflowCount || 0) ? 'fg-warn' : 'fg-good')}
-            ${stat('POC 无指纹', r.pocWithoutFingerCount || 0, (r.pocWithoutFingerCount || 0) ? 'fg-bad' : 'fg-good')}
+            ${stat('POC 无指纹/无效', r.pocWithoutFingerCount || 0, (r.pocWithoutFingerCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('残缺 POC', r.incompletePocCount || 0, (r.incompletePocCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('指纹无 Workflow', r.fingerWithoutWorkflowCount || 0, (r.fingerWithoutWorkflowCount || 0) ? 'fg-warn' : 'fg-good')}
             ${stat('Workflow 无指纹', r.workflowWithoutFingerCount || 0, (r.workflowWithoutFingerCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('弱规则', r.weakRuleCount || 0, (r.weakRuleCount || 0) ? 'fg-bad' : 'fg-good')}
-            ${stat('重复规则组', r.duplicateRuleGroupCount || 0, (r.duplicateRuleGroupCount || 0) ? 'fg-warn' : 'fg-good')}
+            ${stat('重复/共用规则', r.duplicateRuleGroupCount || 0, (r.duplicateRuleGroupCount || 0) ? 'fg-warn' : 'fg-good')}
             ${stat('Workflow 建议', r.workflowSuggestionCount || 0, (r.workflowSuggestionCount || 0) ? 'fg-good' : '')}
-            ${stat('资产识别类', r.assetOnlyProductCount || 0, (r.assetOnlyProductCount || 0) ? 'fg-warn' : '')}
+            ${stat('疑似误识别/资产类', r.assetOnlyProductCount || 0, (r.assetOnlyProductCount || 0) ? 'fg-warn' : '')}
         </div>
         <div class="fg-paths">
             <div><b>dddd:</b> <code>${escapeHtml(r.projectRoot || '')}</code></div>
@@ -5356,28 +5356,176 @@ function renderFingerprintAudit(r, elSummary, elResult) {
         </div>`;
 
     elResult.innerHTML = [
-        renderPocCatalogGroups(r.pocGroups || [], 'builtin'),
-        `<div class="fg-result-grid">` + [
-            renderFingerprintTable('缺失 POC', r.missingPocCount, r.missingPocs, ['产品', 'POC'], (x) => [x.product, x.poc]),
-            renderFingerprintPocDetailTable('虚空 POC：在 config/pocs 但 workflow 不可调用', r.virtualPocCount || r.orphanPocCount, r.virtualPocs || r.orphanPocs),
-            renderFingerprintPocFingerTable('POC 有指纹且可调用', r.pocWithFingerWorkflowCount, r.pocWithFingerWorkflow),
-            renderFingerprintPocFingerTable('POC 有指纹全集', r.pocWithFingerCount, r.pocWithFinger),
-            renderFingerprintList('有指纹但无可用 POC', r.fingerWithoutPocCount, r.fingerWithoutPoc),
-            renderFingerprintPocFingerTable('POC 有指纹但未加载 Workflow', r.pocWithFingerNoWorkflowCount, r.pocWithFingerNoWorkflow),
-            renderFingerprintPocDetailTable('POC 无对应指纹', r.pocWithoutFingerCount, r.pocWithoutFinger),
-            renderFingerprintPocDetailTable('残缺不完整 POC', r.incompletePocCount, r.incompletePocs),
-            renderFingerprintList('有指纹但无 workflow', r.fingerWithoutWorkflowCount, r.fingerWithoutWorkflow),
-            renderFingerprintList('有 workflow 但无指纹', r.workflowWithoutFingerCount, r.workflowWithoutFinger),
-            renderFingerprintTable('弱规则候选', r.weakRuleCount, r.weakRules, ['产品', '原因', '规则'], (x) => [x.product, x.reason, x.rule]),
-            renderFingerprintTable('重复规则组', r.duplicateRuleGroupCount, r.duplicateRules, ['规则', '产品'], (x) => [x.rule, (x.products || []).join(', ')]),
-            renderFingerprintTable('疑似重复产品名', r.duplicateProductGroupCount, r.duplicateProducts, ['归一化名称', '产品'], (x) => [x.name, (x.products || []).join(', ')]),
-            renderFingerprintTable('Workflow 自动建议', r.workflowSuggestionCount, r.workflowSuggestions, ['产品', '候选 POC', '置信度', '原因'], (x) => [x.product, x.pocRelPath || x.poc, x.confidence, x.reason]),
-            renderFingerprintList('资产识别类产品', r.assetOnlyProductCount, r.assetOnlyProducts),
-            renderFingerprintPocDetailTable('全部内置 POC', (r.allPocs || []).length, r.allPocs),
-            renderFingerprintTable('POC 覆盖 Top 50', (r.topWorkflowProducts || []).length, r.topWorkflowProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs]),
-            renderFingerprintTable('指纹规则 Top 50', (r.topFingerProducts || []).length, r.topFingerProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs]),
+        renderFingerprintFixGuide(r),
+        renderFingerprintAuditIssueSections(r),
+        `<div class="fg-reference-head">参考数据</div>`,
+        renderPocCatalogGroups(r.pocGroups || [], 'builtin', false),
+        `<div class="fg-result-grid fg-reference-grid">` + [
+            renderFingerprintPocFingerTable('POC 有指纹且可调用', r.pocWithFingerWorkflowCount, r.pocWithFingerWorkflow, false),
+            renderFingerprintPocFingerTable('POC 有指纹全集', r.pocWithFingerCount, r.pocWithFinger, false),
+            renderFingerprintPocDetailTable('全部内置 POC', (r.allPocs || []).length, r.allPocs, false),
+            renderFingerprintTable('POC 覆盖 Top 50', (r.topWorkflowProducts || []).length, r.topWorkflowProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs], false),
+            renderFingerprintTable('指纹规则 Top 50', (r.topFingerProducts || []).length, r.topFingerProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs], false),
         ].join('') + `</div>`,
     ].join('');
+}
+
+function renderFingerprintFixGuide(r) {
+    const high = (r.fingerWithoutPocCount || 0) + (r.pocWithoutFingerCount || 0) + (r.workflowWithoutFingerCount || 0) + (r.weakRuleCount || 0);
+    const medium = (r.virtualPocCount || r.orphanPocCount || 0) + (r.pocWithFingerNoWorkflowCount || 0) + (r.fingerWithoutWorkflowCount || 0) + (r.duplicateRuleGroupCount || 0) + (r.assetOnlyProductCount || 0);
+    const suggestion = r.workflowSuggestionCount || 0;
+    return `
+        <div class="fg-fix-guide">
+            <div>
+                <b>整改入口</b>
+                <span>下面优先展示所有非 0 问题；每行都标出原因、需要改的文件和建议动作。</span>
+            </div>
+            <div class="fg-fix-guide-stats">
+                <span class="fg-severity fg-severity-high">高优先级 ${escapeHtml(high)}</span>
+                <span class="fg-severity fg-severity-medium">中优先级 ${escapeHtml(medium)}</span>
+                <span class="fg-severity fg-severity-info">自动建议 ${escapeHtml(suggestion)}</span>
+            </div>
+        </div>`;
+}
+
+function renderFingerprintAuditIssueSections(r) {
+    const fingerPath = r.fingerPath || '';
+    const workflowPath = r.workflowPath || '';
+    const pocDir = r.pocDir || '';
+    const sections = [
+        renderFingerprintIssueTable('指纹无 POC：finger.yaml 有产品但没有可用 POC', r.fingerWithoutPocCount, (r.fingerWithoutPoc || []).map((product) => ({
+            level: '高',
+            object: product,
+            reason: '指纹产品没有任何已解析 workflow POC 覆盖',
+            target: 'common/config/workflow.yaml / config/pocs',
+            fix: '为该产品补 workflow.pocs 并创建或关联对应 POC；若只是资产识别，转入误识别/资产类核对。',
+            path: workflowPath || pocDir,
+        }))),
+        renderFingerprintIssueTable('POC 无指纹/疑似无效：POC 无法匹配 finger.yaml 产品', r.pocWithoutFingerCount, (r.pocWithoutFinger || []).map((p) => ({
+            level: '高',
+            object: p.relPath || p.name || p.id || '-',
+            reason: 'POC 的 id / info.name / 文件名无法匹配现有指纹产品',
+            target: 'common/config/finger.yaml / POC YAML',
+            fix: '补充对应产品指纹，或修正 POC 的 id、info.name、文件名，使其能匹配真实产品。',
+            path: p.path || fingerPath,
+        }))),
+        renderFingerprintIssueTable('Workflow 无指纹：workflow.yaml 有产品但 finger.yaml 没有', r.workflowWithoutFingerCount, (r.workflowWithoutFinger || []).map((product) => ({
+            level: '高',
+            object: product,
+            reason: 'workflow 产品无法匹配任何指纹产品',
+            target: 'common/config/finger.yaml / workflow.yaml',
+            fix: '为该产品补 finger.yaml 指纹规则，或统一 workflow 产品名与 finger.yaml 产品名。',
+            path: fingerPath || workflowPath,
+        }))),
+        renderFingerprintIssueTable('弱规则：容易误报或泛匹配', r.weakRuleCount, (r.weakRules || []).map((x) => ({
+            level: '高',
+            object: x.product || '-',
+            reason: x.reason || '弱规则',
+            target: 'common/config/finger.yaml',
+            fix: x.rule || '-',
+            path: fingerPath,
+        }))),
+        renderFingerprintIssueTable('虚空 POC：config/pocs 存在但 workflow 不可调用', r.virtualPocCount || r.orphanPocCount, (r.virtualPocs || r.orphanPocs || []).map((p) => ({
+            level: '中',
+            object: p.relPath || p.name || p.id || '-',
+            reason: 'POC 文件未被 workflow.yaml 引用，实战扫描不会调用',
+            target: 'common/config/workflow.yaml',
+            fix: '确认有效则把 POC id 加入对应产品 workflow.pocs；无效则删除或归档。',
+            path: p.path || workflowPath,
+        }))),
+        renderFingerprintIssueTable('POC 有指纹但未进 Workflow：可直接补调用链', r.pocWithFingerNoWorkflowCount, (r.pocWithFingerNoWorkflow || []).map((x) => ({
+            level: '中',
+            object: x.product || '-',
+            reason: x.pocRelPath || x.poc || '-',
+            target: 'common/config/workflow.yaml',
+            fix: '把该 POC 加入匹配产品的 workflow.pocs，让已有 POC 可被调用。',
+            path: x.path || workflowPath,
+        }))),
+        renderFingerprintIssueTable('残缺不完整 POC：字段或结构需要补齐', r.incompletePocCount, (r.incompletePocs || []).map((p) => ({
+            level: '高',
+            object: p.relPath || p.name || p.id || '-',
+            reason: (p.issues || []).join('；') || 'POC 不完整',
+            target: 'POC YAML',
+            fix: '补齐 id、info.name、severity、requests 等关键字段，避免无法归类或无法调用。',
+            path: p.path || pocDir,
+        }))),
+        renderFingerprintIssueTable('指纹无 Workflow：有识别能力但没有调用配置', r.fingerWithoutWorkflowCount, (r.fingerWithoutWorkflow || []).map((product) => ({
+            level: '中',
+            object: product,
+            reason: 'finger.yaml 有产品，但 workflow.yaml 没有对应产品入口',
+            target: 'common/config/workflow.yaml',
+            fix: '若需要漏洞验证，补 workflow 产品与 pocs；若仅资产识别，保留并在误识别/资产类中确认。',
+            path: workflowPath,
+        }))),
+        renderFingerprintIssueTable('重复/共用规则：多个产品命中同一规则', r.duplicateRuleGroupCount, (r.duplicateRules || []).map((x) => ({
+            level: '中',
+            object: (x.products || []).join(', ') || '-',
+            reason: '同一条规则被多个产品共用，可能造成误识别',
+            target: 'common/config/finger.yaml',
+            fix: x.rule || '-',
+            path: fingerPath,
+        }))),
+        renderFingerprintIssueTable('疑似重复产品名：归一化后产品名冲突', r.duplicateProductGroupCount, (r.duplicateProducts || []).map((x) => ({
+            level: '中',
+            object: x.name || '-',
+            reason: (x.products || []).join(', ') || '-',
+            target: 'finger.yaml / workflow.yaml',
+            fix: '合并同义产品名或统一命名，避免覆盖统计被拆散。',
+            path: fingerPath || workflowPath,
+        }))),
+        renderFingerprintIssueTable('Workflow 自动建议：可参考补 workflow.pocs', r.workflowSuggestionCount, (r.workflowSuggestions || []).map((x) => ({
+            level: '建议',
+            object: x.product || '-',
+            reason: `${x.pocRelPath || x.poc || '-'} · ${x.confidence || 0}`,
+            target: 'common/config/workflow.yaml',
+            fix: x.reason || '候选 POC 与产品名相近，可人工确认后加入 workflow。',
+            path: workflowPath,
+        }))),
+        renderFingerprintIssueTable('疑似误识别/资产识别类：需要人工确认是否应有 POC', r.assetOnlyProductCount, (r.assetOnlyProducts || []).map((product) => ({
+            level: '中',
+            object: product,
+            reason: '有指纹但无 workflow 建议，可能只是资产识别或产品命名不准',
+            target: 'finger.yaml / workflow.yaml',
+            fix: '如果只用于资产识别可标记为资产类；如果需要验证能力，则补 workflow 与 POC。',
+            path: fingerPath || workflowPath,
+        }))),
+        renderFingerprintIssueTable('缺失 POC：workflow.yaml 引用了不存在的 POC', r.missingPocCount, (r.missingPocs || []).map((x) => ({
+            level: '高',
+            object: x.product || '-',
+            reason: x.poc || '-',
+            target: 'config/pocs / workflow.yaml',
+            fix: '创建对应 POC YAML，或从 workflow.pocs 中移除/改正错误引用。',
+            path: workflowPath || pocDir,
+        }))),
+    ].filter(Boolean).join('');
+    return `<div class="fg-problem-grid">${sections || '<div class="fg-empty">没有需要整改的问题。</div>'}</div>`;
+}
+
+function renderFingerprintIssueTable(title, total, items) {
+    const list = (items || []).filter(Boolean);
+    if (!(total || 0) && list.length === 0) return '';
+    const rows = list.map((x) => `
+        <tr>
+            <td><span class="fg-severity fg-severity-${fingerprintIssueSeverityClass(x.level)}">${escapeHtml(x.level || '-')}</span></td>
+            <td title="${escapeHtml(x.object || '')}">${escapeHtml(x.object || '-')}</td>
+            <td title="${escapeHtml(x.reason || '')}">${escapeHtml(x.reason || '-')}</td>
+            <td title="${escapeHtml(x.target || '')}">${escapeHtml(x.target || '-')}</td>
+            <td title="${escapeHtml(x.fix || '')}">${escapeHtml(x.fix || '-')}</td>
+            <td>${x.path ? `<button class="fg-reveal" data-path="${escapeHtml(x.path)}">定位</button>` : '-'}</td>
+        </tr>`).join('');
+    const body = rows ? `
+        <div class="fg-table-wrap">
+        <table class="fg-table fg-issue-table">
+            <thead><tr><th>级别</th><th>对象</th><th>原因</th><th>改哪里</th><th>怎么改</th><th>操作</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>` : '';
+    return renderFingerprintSection(title, total || 0, body, list.length, true);
+}
+
+function fingerprintIssueSeverityClass(level) {
+    if (level === '高') return 'high';
+    if (level === '中') return 'medium';
+    return 'info';
 }
 
 function renderPocCatalogResult(r, elSummary, elResult) {
@@ -5524,9 +5672,9 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
     ].join('');
 }
 
-function renderFingerprintSection(title, total, body, shown = 0) {
+function renderFingerprintSection(title, total, body, shown = 0, defaultOpen) {
     const suffix = total > shown ? ` · 显示前 ${shown} 条` : '';
-    const open = (total || 0) > 0 ? 'open' : '';
+    const open = defaultOpen === false ? '' : ((total || 0) > 0 ? 'open' : '');
     return `
     <details class="fg-section" ${open}>
         <summary>${escapeHtml(title)} <span>${escapeHtml(total || 0)}${escapeHtml(suffix)}</span></summary>
@@ -5534,7 +5682,7 @@ function renderFingerprintSection(title, total, body, shown = 0) {
     </details>`;
 }
 
-function renderFingerprintTable(title, total, items, headers, rowFn) {
+function renderFingerprintTable(title, total, items, headers, rowFn, defaultOpen) {
     const list = items || [];
     const rows = list.map((item) => {
         const cols = rowFn(item).map((v) => `<td title="${escapeHtml(v)}">${escapeHtml(v)}</td>`).join('');
@@ -5546,10 +5694,10 @@ function renderFingerprintTable(title, total, items, headers, rowFn) {
             <thead><tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
             <tbody>${rows}</tbody>
         </table></div>` : '';
-    return renderFingerprintSection(title, total || 0, body, list.length);
+    return renderFingerprintSection(title, total || 0, body, list.length, defaultOpen);
 }
 
-function renderFingerprintPocTable(title, total, items) {
+function renderFingerprintPocTable(title, total, items, defaultOpen) {
     const list = items || [];
     const rows = list.map((x) => `
         <tr>
@@ -5563,10 +5711,10 @@ function renderFingerprintPocTable(title, total, items) {
             <thead><tr><th>文件</th><th>ID</th><th>操作</th></tr></thead>
             <tbody>${rows}</tbody>
         </table></div>` : '';
-    return renderFingerprintSection(title, total || 0, body, list.length);
+    return renderFingerprintSection(title, total || 0, body, list.length, defaultOpen);
 }
 
-function renderFingerprintPocDetailTable(title, total, items) {
+function renderFingerprintPocDetailTable(title, total, items, defaultOpen) {
     const list = items || [];
     const rows = list.map((x) => {
         const workflow = (x.workflowProducts || []).join(', ') || (x.referencedByWorkflow ? '已引用' : '未引用');
@@ -5589,10 +5737,10 @@ function renderFingerprintPocDetailTable(title, total, items) {
             <thead><tr><th>文件</th><th>ID</th><th>info.name</th><th>匹配指纹</th><th>Workflow</th><th>问题</th><th>操作</th></tr></thead>
             <tbody>${rows}</tbody>
         </table></div>` : '';
-    return renderFingerprintSection(title, total || 0, body, list.length);
+    return renderFingerprintSection(title, total || 0, body, list.length, defaultOpen);
 }
 
-function renderFingerprintPocFingerTable(title, total, items) {
+function renderFingerprintPocFingerTable(title, total, items, defaultOpen) {
     const list = items || [];
     const rows = list.map((x) => `
         <tr>
@@ -5609,10 +5757,10 @@ function renderFingerprintPocFingerTable(title, total, items) {
             <thead><tr><th>指纹</th><th>POC 文件</th><th>ID</th><th>置信</th><th>匹配依据</th><th>操作</th></tr></thead>
             <tbody>${rows}</tbody>
         </table></div>` : '';
-    return renderFingerprintSection(title, total || 0, body, list.length);
+    return renderFingerprintSection(title, total || 0, body, list.length, defaultOpen);
 }
 
-function renderPocCatalogGroups(groups, sourceType = 'builtin') {
+function renderPocCatalogGroups(groups, sourceType = 'builtin', defaultOpen) {
     const list = groups || [];
     const isExternal = sourceType === 'external';
     const cards = list.map((g, i) => {
@@ -5649,15 +5797,15 @@ function renderPocCatalogGroups(groups, sourceType = 'builtin') {
         </section>`;
     }).join('');
     const body = cards ? `<div class="fg-catalog-groups">${cards}</div>` : '';
-    return renderFingerprintSection('按组件指纹归类', list.length, body, list.length);
+    return renderFingerprintSection('按组件指纹归类', list.length, body, list.length, defaultOpen);
 }
 
-function renderFingerprintList(title, total, items) {
+function renderFingerprintList(title, total, items, defaultOpen) {
     const list = items || [];
     const body = list.length
         ? `<div class="fg-chip-list">${list.map((x) => `<span class="fg-chip" title="${escapeHtml(x)}">${escapeHtml(x)}</span>`).join('')}</div>`
         : '';
-    return renderFingerprintSection(title, total || 0, body, list.length);
+    return renderFingerprintSection(title, total || 0, body, list.length, defaultOpen);
 }
 
 // ============================================================
