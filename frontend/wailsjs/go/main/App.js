@@ -26,6 +26,10 @@ export function CancelCurrentTask() {
   return window['go']['main']['App']['CancelCurrentTask']();
 }
 
+export function ClassifyDDDDBuiltinPocs(arg1) {
+  return window['go']['main']['App']['ClassifyDDDDBuiltinPocs'](arg1);
+}
+
 export function ConvertMarkdownBatch(arg1) {
   return window['go']['main']['App']['ConvertMarkdownBatch'](arg1);
 }

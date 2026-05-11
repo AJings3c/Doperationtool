@@ -1,13 +1,13 @@
 export namespace main {
-	
+
 	export class CategoryAssignment {
 	    name: string;
 	    paths: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CategoryAssignment(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -19,11 +19,11 @@ export namespace main {
 	    assignments: CategoryAssignment[];
 	    dryRun: boolean;
 	    onConflict: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ApplyCategoriesRequest(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.targetDir = source["targetDir"];
@@ -31,7 +31,7 @@ export namespace main {
 	        this.dryRun = source["dryRun"];
 	        this.onConflict = source["onConflict"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -56,11 +56,11 @@ export namespace main {
 	    category: string;
 	    skipped: boolean;
 	    reason?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ApplyResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.srcPath = source["srcPath"];
@@ -77,11 +77,11 @@ export namespace main {
 	    dryRun: boolean;
 	    items: ApplyResult[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ApplyCategoriesResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.targetDir = source["targetDir"];
@@ -91,7 +91,7 @@ export namespace main {
 	        this.items = this.convertValues(source["items"], ApplyResult);
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -110,7 +110,7 @@ export namespace main {
 		    return a;
 		}
 	}
-	
+
 	export class AutoFixOptions {
 	    dryRun: boolean;
 	    backup: boolean;
@@ -121,11 +121,11 @@ export namespace main {
 	    fixRequestsHTTP: boolean;
 	    fixId: boolean;
 	    dedupId: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AutoFixOptions(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.dryRun = source["dryRun"];
@@ -143,11 +143,11 @@ export namespace main {
 	    path: string;
 	    oldId: string;
 	    newId: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DedupRename(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -163,11 +163,11 @@ export namespace main {
 	    backupPath?: string;
 	    skipped: boolean;
 	    skipReason?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FileFixChange(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -189,11 +189,11 @@ export namespace main {
 	    changes: FileFixChange[];
 	    dedupRenames: DedupRename[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AutoFixResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.folder = source["folder"];
@@ -206,7 +206,7 @@ export namespace main {
 	        this.dedupRenames = this.convertValues(source["dedupRenames"], DedupRename);
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -225,7 +225,7 @@ export namespace main {
 		    return a;
 		}
 	}
-	
+
 	export class CategoryFile {
 	    path: string;
 	    relPath: string;
@@ -233,11 +233,11 @@ export namespace main {
 	    id: string;
 	    token: string;
 	    size: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CategoryFile(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -252,18 +252,18 @@ export namespace main {
 	    name: string;
 	    tokens: string[];
 	    files: CategoryFile[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ProposedCategory(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.tokens = source["tokens"];
 	        this.files = this.convertValues(source["files"], CategoryFile);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -288,11 +288,11 @@ export namespace main {
 	    categories: ProposedCategory[];
 	    uncategorized: CategoryFile[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CategoryScanResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.folder = source["folder"];
@@ -301,7 +301,7 @@ export namespace main {
 	        this.uncategorized = this.convertValues(source["uncategorized"], CategoryFile);
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -328,11 +328,11 @@ export namespace main {
 	    bucket: string;
 	    bucketKind: string;
 	    size: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CollectFile(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -348,18 +348,18 @@ export namespace main {
 	    name: string;
 	    kind: string;
 	    files: CollectFile[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CollectGroup(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.kind = source["kind"];
 	        this.files = this.convertValues(source["files"], CollectFile);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -384,11 +384,11 @@ export namespace main {
 	    groups: CollectGroup[];
 	    uncategorized: CollectFile[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CollectScanResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.folder = source["folder"];
@@ -397,7 +397,7 @@ export namespace main {
 	        this.uncategorized = this.convertValues(source["uncategorized"], CollectFile);
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -420,11 +420,11 @@ export namespace main {
 	    name: string;
 	    content: string;
 	    sourcePath: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ConvertBatchItem(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -443,11 +443,11 @@ export namespace main {
 	    sourceName: string;
 	    warnings: string[];
 	    payloadHash: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ConvertResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.yaml = source["yaml"];
@@ -467,11 +467,11 @@ export namespace main {
 	    total: number;
 	    failed: number;
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ConvertBatchResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.results = this.convertValues(source["results"], ConvertResult);
@@ -479,7 +479,7 @@ export namespace main {
 	        this.failed = source["failed"];
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -498,23 +498,23 @@ export namespace main {
 		    return a;
 		}
 	}
-	
+
 	export class ConvertedBatch {
 	    results: ConvertResult[];
 	    total: number;
 	    failed: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ConvertedBatch(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.results = this.convertValues(source["results"], ConvertResult);
 	        this.total = source["total"];
 	        this.failed = source["failed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -533,7 +533,7 @@ export namespace main {
 		    return a;
 		}
 	}
-	
+
 	export class DupTemplate {
 	    path: string;
 	    relPath: string;
@@ -541,11 +541,11 @@ export namespace main {
 	    id: string;
 	    nameKey: string;
 	    size: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DupTemplate(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -562,11 +562,11 @@ export namespace main {
 	    sharedIds: string[];
 	    sharedNames: string[];
 	    templates: DupTemplate[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DupGroup(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.groupKey = source["groupKey"];
@@ -575,7 +575,7 @@ export namespace main {
 	        this.sharedNames = source["sharedNames"];
 	        this.templates = this.convertValues(source["templates"], DupTemplate);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -600,11 +600,11 @@ export namespace main {
 	    duplicateCount: number;
 	    groups: DupGroup[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DupScanResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.folder = source["folder"];
@@ -613,7 +613,7 @@ export namespace main {
 	        this.groups = this.convertValues(source["groups"], DupGroup);
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -632,17 +632,17 @@ export namespace main {
 		    return a;
 		}
 	}
-	
-	
+
+
 	export class FingerprintCoverage {
 	    product: string;
 	    fingerRules: number;
 	    pocs: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintCoverage(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.product = source["product"];
@@ -657,11 +657,11 @@ export namespace main {
 	    pocRelPath: string;
 	    confidence: number;
 	    reason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintWorkflowSuggestion(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.product = source["product"];
@@ -675,11 +675,11 @@ export namespace main {
 	export class FingerprintNameDup {
 	    name: string;
 	    products: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintNameDup(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -689,11 +689,11 @@ export namespace main {
 	export class FingerprintRuleDup {
 	    rule: string;
 	    products: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintRuleDup(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rule = source["rule"];
@@ -704,11 +704,11 @@ export namespace main {
 	    product: string;
 	    rule: string;
 	    reason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintRuleIssue(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.product = source["product"];
@@ -724,11 +724,11 @@ export namespace main {
 	    confidence: number;
 	    reason: string;
 	    path: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintPocFingerMatch(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.product = source["product"];
@@ -745,27 +745,47 @@ export namespace main {
 	    relPath: string;
 	    name: string;
 	    id: string;
-	
+	    infoName: string;
+	    severity: string;
+	    tags: string[];
+	    referencedByWorkflow: boolean;
+	    workflowProducts: string[];
+	    matchedProduct: string;
+	    matchConfidence: number;
+	    matchReason: string;
+	    incomplete: boolean;
+	    issues: string[];
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintPocInfo(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
 	        this.relPath = source["relPath"];
 	        this.name = source["name"];
 	        this.id = source["id"];
+	        this.infoName = source["infoName"];
+	        this.severity = source["severity"];
+	        this.tags = source["tags"];
+	        this.referencedByWorkflow = source["referencedByWorkflow"];
+	        this.workflowProducts = source["workflowProducts"];
+	        this.matchedProduct = source["matchedProduct"];
+	        this.matchConfidence = source["matchConfidence"];
+	        this.matchReason = source["matchReason"];
+	        this.incomplete = source["incomplete"];
+	        this.issues = source["issues"];
 	    }
 	}
 	export class FingerprintWorkflowPoc {
 	    product: string;
 	    poc: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintWorkflowPoc(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.product = source["product"];
@@ -788,8 +808,12 @@ export namespace main {
 	    fingerWithoutWorkflowCount: number;
 	    workflowWithoutFingerCount: number;
 	    fingerWithoutPocCount: number;
+	    pocWithFingerCount: number;
+	    pocWithFingerWorkflowCount: number;
 	    pocWithFingerNoWorkflowCount: number;
 	    pocWithoutFingerCount: number;
+	    virtualPocCount: number;
+	    incompletePocCount: number;
 	    weakRuleCount: number;
 	    duplicateRuleGroupCount: number;
 	    duplicateProductGroupCount: number;
@@ -800,8 +824,13 @@ export namespace main {
 	    fingerWithoutWorkflow: string[];
 	    workflowWithoutFinger: string[];
 	    fingerWithoutPoc: string[];
+	    pocWithFinger: FingerprintPocFingerMatch[];
+	    pocWithFingerWorkflow: FingerprintPocFingerMatch[];
 	    pocWithFingerNoWorkflow: FingerprintPocFingerMatch[];
 	    pocWithoutFinger: FingerprintPocInfo[];
+	    virtualPocs: FingerprintPocInfo[];
+	    incompletePocs: FingerprintPocInfo[];
+	    allPocs: FingerprintPocInfo[];
 	    weakRules: FingerprintRuleIssue[];
 	    duplicateRules: FingerprintRuleDup[];
 	    duplicateProducts: FingerprintNameDup[];
@@ -810,11 +839,11 @@ export namespace main {
 	    topWorkflowProducts: FingerprintCoverage[];
 	    topFingerProducts: FingerprintCoverage[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintAuditResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectRoot = source["projectRoot"];
@@ -832,8 +861,12 @@ export namespace main {
 	        this.fingerWithoutWorkflowCount = source["fingerWithoutWorkflowCount"];
 	        this.workflowWithoutFingerCount = source["workflowWithoutFingerCount"];
 	        this.fingerWithoutPocCount = source["fingerWithoutPocCount"];
+	        this.pocWithFingerCount = source["pocWithFingerCount"];
+	        this.pocWithFingerWorkflowCount = source["pocWithFingerWorkflowCount"];
 	        this.pocWithFingerNoWorkflowCount = source["pocWithFingerNoWorkflowCount"];
 	        this.pocWithoutFingerCount = source["pocWithoutFingerCount"];
+	        this.virtualPocCount = source["virtualPocCount"];
+	        this.incompletePocCount = source["incompletePocCount"];
 	        this.weakRuleCount = source["weakRuleCount"];
 	        this.duplicateRuleGroupCount = source["duplicateRuleGroupCount"];
 	        this.duplicateProductGroupCount = source["duplicateProductGroupCount"];
@@ -844,8 +877,13 @@ export namespace main {
 	        this.fingerWithoutWorkflow = source["fingerWithoutWorkflow"];
 	        this.workflowWithoutFinger = source["workflowWithoutFinger"];
 	        this.fingerWithoutPoc = source["fingerWithoutPoc"];
+	        this.pocWithFinger = this.convertValues(source["pocWithFinger"], FingerprintPocFingerMatch);
+	        this.pocWithFingerWorkflow = this.convertValues(source["pocWithFingerWorkflow"], FingerprintPocFingerMatch);
 	        this.pocWithFingerNoWorkflow = this.convertValues(source["pocWithFingerNoWorkflow"], FingerprintPocFingerMatch);
 	        this.pocWithoutFinger = this.convertValues(source["pocWithoutFinger"], FingerprintPocInfo);
+	        this.virtualPocs = this.convertValues(source["virtualPocs"], FingerprintPocInfo);
+	        this.incompletePocs = this.convertValues(source["incompletePocs"], FingerprintPocInfo);
+	        this.allPocs = this.convertValues(source["allPocs"], FingerprintPocInfo);
 	        this.weakRules = this.convertValues(source["weakRules"], FingerprintRuleIssue);
 	        this.duplicateRules = this.convertValues(source["duplicateRules"], FingerprintRuleDup);
 	        this.duplicateProducts = this.convertValues(source["duplicateProducts"], FingerprintNameDup);
@@ -855,7 +893,7 @@ export namespace main {
 	        this.topFingerProducts = this.convertValues(source["topFingerProducts"], FingerprintCoverage);
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -874,17 +912,17 @@ export namespace main {
 		    return a;
 		}
 	}
-	
+
 	export class FingerprintImportApplyRequest {
 	    projectRoot: string;
 	    ddddYaml: string;
 	    confirm: boolean;
 	    confirmation: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintImportApplyRequest(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectRoot = source["projectRoot"];
@@ -902,11 +940,11 @@ export namespace main {
 	    rulesSkipped: number;
 	    changedProducts: string[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintImportApplyResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.targetFingerPath = source["targetFingerPath"];
@@ -930,11 +968,11 @@ export namespace main {
 	    reasons: string[];
 	    original: string;
 	    source: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintImportRule(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.expression = source["expression"];
@@ -959,11 +997,11 @@ export namespace main {
 	    quality: string;
 	    rules: FingerprintImportRule[];
 	    warnings: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintImportItem(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.product = source["product"];
@@ -976,7 +1014,7 @@ export namespace main {
 	        this.rules = this.convertValues(source["rules"], FingerprintImportRule);
 	        this.warnings = source["warnings"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -999,11 +1037,11 @@ export namespace main {
 	    path: string;
 	    relPath: string;
 	    reason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintImportSkip(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -1016,11 +1054,11 @@ export namespace main {
 	    products: string[];
 	    existing: string[];
 	    imported: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintMergeSuggestion(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.normalizedProduct = source["normalizedProduct"];
@@ -1050,11 +1088,11 @@ export namespace main {
 	    ddddYaml: string;
 	    patchPreview: string;
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new FingerprintImportPreviewResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceDir = source["sourceDir"];
@@ -1078,7 +1116,7 @@ export namespace main {
 	        this.patchPreview = source["patchPreview"];
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1097,26 +1135,139 @@ export namespace main {
 		    return a;
 		}
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+	export class FingerprintPocComponentGroup {
+	    product: string;
+	    normalizedProduct: string;
+	    fingerRuleCount: number;
+	    workflowPocCount: number;
+	    pocCount: number;
+	    referencedPocCount: number;
+	    unreferencedPocCount: number;
+	    incompletePocCount: number;
+	    pocs: FingerprintPocInfo[];
+
+	    static createFrom(source: any = {}) {
+	        return new FingerprintPocComponentGroup(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.product = source["product"];
+	        this.normalizedProduct = source["normalizedProduct"];
+	        this.fingerRuleCount = source["fingerRuleCount"];
+	        this.workflowPocCount = source["workflowPocCount"];
+	        this.pocCount = source["pocCount"];
+	        this.referencedPocCount = source["referencedPocCount"];
+	        this.unreferencedPocCount = source["unreferencedPocCount"];
+	        this.incompletePocCount = source["incompletePocCount"];
+	        this.pocs = this.convertValues(source["pocs"], FingerprintPocInfo);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FingerprintPocCatalogResult {
+	    projectRoot: string;
+	    fingerPath: string;
+	    workflowPath: string;
+	    pocDir: string;
+	    fingerCount: number;
+	    workflowCount: number;
+	    pocFileCount: number;
+	    classifiedPocCount: number;
+	    unmatchedPocCount: number;
+	    workflowPocCount: number;
+	    virtualPocCount: number;
+	    incompletePocCount: number;
+	    componentCount: number;
+	    allPocs: FingerprintPocInfo[];
+	    groups: FingerprintPocComponentGroup[];
+	    unmatchedPocs: FingerprintPocInfo[];
+	    virtualPocs: FingerprintPocInfo[];
+	    incompletePocs: FingerprintPocInfo[];
+	    elapsed: string;
+
+	    static createFrom(source: any = {}) {
+	        return new FingerprintPocCatalogResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.fingerPath = source["fingerPath"];
+	        this.workflowPath = source["workflowPath"];
+	        this.pocDir = source["pocDir"];
+	        this.fingerCount = source["fingerCount"];
+	        this.workflowCount = source["workflowCount"];
+	        this.pocFileCount = source["pocFileCount"];
+	        this.classifiedPocCount = source["classifiedPocCount"];
+	        this.unmatchedPocCount = source["unmatchedPocCount"];
+	        this.workflowPocCount = source["workflowPocCount"];
+	        this.virtualPocCount = source["virtualPocCount"];
+	        this.incompletePocCount = source["incompletePocCount"];
+	        this.componentCount = source["componentCount"];
+	        this.allPocs = this.convertValues(source["allPocs"], FingerprintPocInfo);
+	        this.groups = this.convertValues(source["groups"], FingerprintPocComponentGroup);
+	        this.unmatchedPocs = this.convertValues(source["unmatchedPocs"], FingerprintPocInfo);
+	        this.virtualPocs = this.convertValues(source["virtualPocs"], FingerprintPocInfo);
+	        this.incompletePocs = this.convertValues(source["incompletePocs"], FingerprintPocInfo);
+	        this.elapsed = source["elapsed"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+
+
+
+
+
+
 	export class YamlFile {
 	    name: string;
 	    path: string;
 	    content: string;
 	    relPath: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new YamlFile(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -1129,18 +1280,18 @@ export namespace main {
 	    files: YamlFile[];
 	    truncated: boolean;
 	    limit: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new LoadDirectoryResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.files = this.convertValues(source["files"], YamlFile);
 	        this.truncated = source["truncated"];
 	        this.limit = source["limit"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1164,11 +1315,11 @@ export namespace main {
 	    targetDir: string;
 	    dryRun: boolean;
 	    onConflict: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MoveDuplicatesRequest(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.paths = source["paths"];
@@ -1182,11 +1333,11 @@ export namespace main {
 	    dstPath: string;
 	    skipped: boolean;
 	    reason?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MoveResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.srcPath = source["srcPath"];
@@ -1202,11 +1353,11 @@ export namespace main {
 	    dryRun: boolean;
 	    items: MoveResult[];
 	    elapsed: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MoveDuplicatesResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.targetDir = source["targetDir"];
@@ -1216,7 +1367,7 @@ export namespace main {
 	        this.items = this.convertValues(source["items"], MoveResult);
 	        this.elapsed = source["elapsed"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1235,16 +1386,16 @@ export namespace main {
 		    return a;
 		}
 	}
-	
+
 	export class ValidateIssue {
 	    path: string;
 	    cause: string;
 	    line: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ValidateIssue(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -1262,11 +1413,11 @@ export namespace main {
 	    elapsed: string;
 	    binary: string;
 	    version: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new NucleiValidateResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.folder = source["folder"];
@@ -1279,7 +1430,7 @@ export namespace main {
 	        this.binary = source["binary"];
 	        this.version = source["version"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1298,16 +1449,16 @@ export namespace main {
 		    return a;
 		}
 	}
-	
+
 	export class SkippedItem {
 	    name: string;
 	    reason: string;
 	    dupOf: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SkippedItem(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -1322,11 +1473,11 @@ export namespace main {
 	    skippedDupPayload: number;
 	    writtenNames: string[];
 	    skippedItems: SkippedItem[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SaveYamlBatchResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.written = source["written"];
@@ -1336,7 +1487,7 @@ export namespace main {
 	        this.writtenNames = source["writtenNames"];
 	        this.skippedItems = this.convertValues(source["skippedItems"], SkippedItem);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1355,17 +1506,17 @@ export namespace main {
 		    return a;
 		}
 	}
-	
-	
-	
+
+
+
 	export class YamlOutFile {
 	    name: string;
 	    content: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new YamlOutFile(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];

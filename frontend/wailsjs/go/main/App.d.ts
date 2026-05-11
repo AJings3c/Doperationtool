@@ -14,6 +14,8 @@ export function AutoFixNucleiTemplates(arg1:string,arg2:main.AutoFixOptions):Pro
 
 export function CancelCurrentTask():Promise<string>;
 
+export function ClassifyDDDDBuiltinPocs(arg1:string):Promise<main.FingerprintPocCatalogResult>;
+
 export function ConvertMarkdownBatch(arg1:Array<main.ConvertBatchItem>):Promise<main.ConvertBatchResult>;
 
 export function ConvertMarkdownFile(arg1:string):Promise<main.ConvertResult>;

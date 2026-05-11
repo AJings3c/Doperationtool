@@ -76,8 +76,17 @@ Gamma:
 	if res.PocWithFingerNoWorkflowCount != 1 || len(res.PocWithFingerNoWorkflow) != 1 || res.PocWithFingerNoWorkflow[0].Product != "Beta" {
 		t.Fatalf("PocWithFingerNoWorkflow = %#v, count=%d", res.PocWithFingerNoWorkflow, res.PocWithFingerNoWorkflowCount)
 	}
-	if res.PocWithoutFingerCount != 1 || len(res.PocWithoutFinger) != 1 || res.PocWithoutFinger[0].ID != "orphan-id" {
+	if res.PocWithFingerCount != 2 || res.PocWithFingerWorkflowCount != 1 {
+		t.Fatalf("poc with finger counts = %d/%d, pocs=%#v", res.PocWithFingerCount, res.PocWithFingerWorkflowCount, res.PocWithFinger)
+	}
+	if res.VirtualPocCount != 2 || len(res.VirtualPocs) != 2 {
+		t.Fatalf("VirtualPocs = %#v, count=%d", res.VirtualPocs, res.VirtualPocCount)
+	}
+	if res.PocWithoutFingerCount != 2 || len(res.PocWithoutFinger) != 2 {
 		t.Fatalf("PocWithoutFinger = %#v, count=%d", res.PocWithoutFinger, res.PocWithoutFingerCount)
+	}
+	if res.IncompletePocCount != 4 || len(res.IncompletePocs) != 4 {
+		t.Fatalf("IncompletePocs = %#v, count=%d", res.IncompletePocs, res.IncompletePocCount)
 	}
 	if res.WeakRuleCount != 2 || len(res.WeakRules) != 2 {
 		t.Fatalf("WeakRuleCount = %d, weakRules=%#v, want 2", res.WeakRuleCount, res.WeakRules)
@@ -100,6 +109,37 @@ func TestAuditFingerprintKnowledgeRequiresDDDDLayout(t *testing.T) {
 	_, err := NewApp().AuditFingerprintKnowledge(t.TempDir())
 	if err == nil {
 		t.Fatal("expected missing config paths error")
+	}
+}
+
+func TestClassifyDDDDBuiltinPocs(t *testing.T) {
+	root := t.TempDir()
+	cfgDir := filepath.Join(root, "common", "config")
+	pocDir := filepath.Join(cfgDir, "pocs")
+	if err := os.MkdirAll(pocDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(cfgDir, "finger.yaml"), "Alpha:\n  - 'title=\"Alpha\"'\nBeta:\n  - 'body=\"Beta\"'\n")
+	writeTestFile(t, filepath.Join(cfgDir, "workflow.yaml"), "Alpha:\n  pocs:\n    - alpha-rce\n")
+	writeTestFile(t, filepath.Join(pocDir, "alpha-rce.yaml"), "id: alpha-rce\ninfo:\n  name: Alpha RCE\n  severity: high\nhttp:\n  - matchers:\n      - type: word\n        words: [Alpha]\n")
+	writeTestFile(t, filepath.Join(pocDir, "beta.yaml"), "id: beta\ninfo:\n  name: Beta Panel\n")
+	writeTestFile(t, filepath.Join(pocDir, "unknown.yaml"), "id: unknown\ninfo:\n  name: Unknown\n  severity: low\nhttp:\n  - matchers:\n      - type: word\n        words: [Unknown]\n")
+
+	res, err := NewApp().ClassifyDDDDBuiltinPocs(root)
+	if err != nil {
+		t.Fatalf("ClassifyDDDDBuiltinPocs returned error: %v", err)
+	}
+	if res.PocFileCount != 3 || len(res.AllPocs) != 3 {
+		t.Fatalf("all pocs = %d/%d", res.PocFileCount, len(res.AllPocs))
+	}
+	if res.ClassifiedPocCount != 2 || res.UnmatchedPocCount != 1 || res.ComponentCount != 2 {
+		t.Fatalf("classified/unmatched/groups = %d/%d/%d groups=%#v", res.ClassifiedPocCount, res.UnmatchedPocCount, res.ComponentCount, res.Groups)
+	}
+	if res.VirtualPocCount != 2 || len(res.VirtualPocs) != 2 {
+		t.Fatalf("virtual pocs = %#v count=%d", res.VirtualPocs, res.VirtualPocCount)
+	}
+	if res.IncompletePocCount != 1 || len(res.IncompletePocs) != 1 || res.IncompletePocs[0].ID != "beta" {
+		t.Fatalf("incomplete pocs = %#v count=%d", res.IncompletePocs, res.IncompletePocCount)
 	}
 }
 

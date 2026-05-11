@@ -29,8 +29,12 @@ type FingerprintAuditResult struct {
 	FingerWithoutWorkflowCount   int                             `json:"fingerWithoutWorkflowCount"`
 	WorkflowWithoutFingerCount   int                             `json:"workflowWithoutFingerCount"`
 	FingerWithoutPocCount        int                             `json:"fingerWithoutPocCount"`
+	PocWithFingerCount           int                             `json:"pocWithFingerCount"`
+	PocWithFingerWorkflowCount   int                             `json:"pocWithFingerWorkflowCount"`
 	PocWithFingerNoWorkflowCount int                             `json:"pocWithFingerNoWorkflowCount"`
 	PocWithoutFingerCount        int                             `json:"pocWithoutFingerCount"`
+	VirtualPocCount              int                             `json:"virtualPocCount"`
+	IncompletePocCount           int                             `json:"incompletePocCount"`
 	WeakRuleCount                int                             `json:"weakRuleCount"`
 	DuplicateRuleGroupCount      int                             `json:"duplicateRuleGroupCount"`
 	DuplicateProductGroupCount   int                             `json:"duplicateProductGroupCount"`
@@ -41,8 +45,13 @@ type FingerprintAuditResult struct {
 	FingerWithoutWorkflow        []string                        `json:"fingerWithoutWorkflow"`
 	WorkflowWithoutFinger        []string                        `json:"workflowWithoutFinger"`
 	FingerWithoutPoc             []string                        `json:"fingerWithoutPoc"`
+	PocWithFinger                []FingerprintPocFingerMatch     `json:"pocWithFinger"`
+	PocWithFingerWorkflow        []FingerprintPocFingerMatch     `json:"pocWithFingerWorkflow"`
 	PocWithFingerNoWorkflow      []FingerprintPocFingerMatch     `json:"pocWithFingerNoWorkflow"`
 	PocWithoutFinger             []FingerprintPocInfo            `json:"pocWithoutFinger"`
+	VirtualPocs                  []FingerprintPocInfo            `json:"virtualPocs"`
+	IncompletePocs               []FingerprintPocInfo            `json:"incompletePocs"`
+	AllPocs                      []FingerprintPocInfo            `json:"allPocs"`
 	WeakRules                    []FingerprintRuleIssue          `json:"weakRules"`
 	DuplicateRules               []FingerprintRuleDup            `json:"duplicateRules"`
 	DuplicateProducts            []FingerprintNameDup            `json:"duplicateProducts"`
@@ -59,10 +68,20 @@ type FingerprintWorkflowPoc struct {
 }
 
 type FingerprintPocInfo struct {
-	Path    string `json:"path"`
-	RelPath string `json:"relPath"`
-	Name    string `json:"name"`
-	ID      string `json:"id"`
+	Path                 string   `json:"path"`
+	RelPath              string   `json:"relPath"`
+	Name                 string   `json:"name"`
+	ID                   string   `json:"id"`
+	InfoName             string   `json:"infoName"`
+	Severity             string   `json:"severity"`
+	Tags                 []string `json:"tags"`
+	ReferencedByWorkflow bool     `json:"referencedByWorkflow"`
+	WorkflowProducts     []string `json:"workflowProducts"`
+	MatchedProduct       string   `json:"matchedProduct"`
+	MatchConfidence      int      `json:"matchConfidence"`
+	MatchReason          string   `json:"matchReason"`
+	Incomplete           bool     `json:"incomplete"`
+	Issues               []string `json:"issues"`
 }
 
 type FingerprintPocFingerMatch struct {
@@ -106,6 +125,40 @@ type FingerprintWorkflowSuggestion struct {
 	Reason     string `json:"reason"`
 }
 
+type FingerprintPocCatalogResult struct {
+	ProjectRoot        string                         `json:"projectRoot"`
+	FingerPath         string                         `json:"fingerPath"`
+	WorkflowPath       string                         `json:"workflowPath"`
+	PocDir             string                         `json:"pocDir"`
+	FingerCount        int                            `json:"fingerCount"`
+	WorkflowCount      int                            `json:"workflowCount"`
+	PocFileCount       int                            `json:"pocFileCount"`
+	ClassifiedPocCount int                            `json:"classifiedPocCount"`
+	UnmatchedPocCount  int                            `json:"unmatchedPocCount"`
+	WorkflowPocCount   int                            `json:"workflowPocCount"`
+	VirtualPocCount    int                            `json:"virtualPocCount"`
+	IncompletePocCount int                            `json:"incompletePocCount"`
+	ComponentCount     int                            `json:"componentCount"`
+	AllPocs            []FingerprintPocInfo           `json:"allPocs"`
+	Groups             []FingerprintPocComponentGroup `json:"groups"`
+	UnmatchedPocs      []FingerprintPocInfo           `json:"unmatchedPocs"`
+	VirtualPocs        []FingerprintPocInfo           `json:"virtualPocs"`
+	IncompletePocs     []FingerprintPocInfo           `json:"incompletePocs"`
+	Elapsed            string                         `json:"elapsed"`
+}
+
+type FingerprintPocComponentGroup struct {
+	Product              string               `json:"product"`
+	NormalizedProduct    string               `json:"normalizedProduct"`
+	FingerRuleCount      int                  `json:"fingerRuleCount"`
+	WorkflowPocCount     int                  `json:"workflowPocCount"`
+	PocCount             int                  `json:"pocCount"`
+	ReferencedPocCount   int                  `json:"referencedPocCount"`
+	UnreferencedPocCount int                  `json:"unreferencedPocCount"`
+	IncompletePocCount   int                  `json:"incompletePocCount"`
+	Pocs                 []FingerprintPocInfo `json:"pocs"`
+}
+
 type fingerEntry struct {
 	Product string
 	Rules   []string
@@ -120,6 +173,17 @@ type workflowEntry struct {
 const fingerprintAuditListLimit = 200
 
 var reFingerClause = regexp.MustCompile(`(?i)(body|title|header|banner|cert)\s*(?:=|~=)\s*"([^"]*)"`)
+
+type fingerprintPocTemplateMeta struct {
+	ID           string
+	InfoName     string
+	Severity     string
+	Tags         []string
+	HasRequest   bool
+	HasMatcher   bool
+	HasExtractor bool
+	ParseError   string
+}
 
 func (a *App) AuditFingerprintKnowledge(projectRoot string) (*FingerprintAuditResult, error) {
 	start := time.Now()
@@ -176,6 +240,58 @@ func (a *App) AuditFingerprintKnowledge(projectRoot string) (*FingerprintAuditRe
 	pe.switchPhase("analyzing", 0)
 	pe.forceEmit(0, "分析指纹 / workflow / POC 关联")
 	res := buildFingerprintAudit(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs)
+	res.Elapsed = time.Since(start).Truncate(10 * time.Millisecond).String()
+	return res, nil
+}
+
+func (a *App) ClassifyDDDDBuiltinPocs(projectRoot string) (*FingerprintPocCatalogResult, error) {
+	start := time.Now()
+	root := strings.TrimSpace(projectRoot)
+	if root == "" {
+		return nil, fmt.Errorf("dddd 根目录为空")
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("dddd 根目录不可访问: %v", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("不是目录: %s", root)
+	}
+
+	fingerPath := filepath.Join(root, "common", "config", "finger.yaml")
+	workflowPath := filepath.Join(root, "common", "config", "workflow.yaml")
+	pocDir := filepath.Join(root, "common", "config", "pocs")
+	for _, p := range []string{fingerPath, workflowPath, pocDir} {
+		if _, statErr := os.Stat(p); statErr != nil {
+			return nil, fmt.Errorf("缺少 dddd 配置路径 %s: %v", p, statErr)
+		}
+	}
+
+	ctx, pe, cleanup := a.beginTask("fingerprint:poc_catalog:progress", "scanning", 0)
+	defer cleanup()
+	defer pe.finish("POC 归类完成")
+
+	pe.forceEmit(0, "读取 finger.yaml")
+	fingers, err := loadFingerEntries(ctx, fingerPath)
+	if err != nil {
+		return nil, err
+	}
+	pe.forceEmit(0, "读取 workflow.yaml")
+	workflows, err := loadWorkflowEntries(ctx, workflowPath)
+	if err != nil {
+		return nil, err
+	}
+	pe.forceEmit(0, "扫描内置 POC")
+	pocs, err := scanFingerprintPocs(ctx, pe, pocDir)
+	if err != nil {
+		return nil, err
+	}
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("已取消")
+	}
+	pe.switchPhase("analyzing", 0)
+	pe.forceEmit(0, "按组件指纹归类 POC")
+	res := buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs)
 	res.Elapsed = time.Since(start).Truncate(10 * time.Millisecond).String()
 	return res, nil
 }
@@ -314,11 +430,12 @@ func scanFingerprintPocs(ctx context.Context, pe *progressEmitter, dir string) (
 		if relErr != nil {
 			rel = name
 		}
-		id := ""
+		meta := fingerprintPocTemplateMeta{}
 		if raw, readErr := os.ReadFile(path); readErr == nil {
-			id = extractTopLevelId(string(raw))
+			meta = parseFingerprintPocTemplateMeta(raw)
 		}
-		pocs = append(pocs, FingerprintPocInfo{Path: path, RelPath: rel, Name: name, ID: id})
+		issues := fingerprintPocIncompleteIssues(meta)
+		pocs = append(pocs, FingerprintPocInfo{Path: path, RelPath: rel, Name: name, ID: meta.ID, InfoName: meta.InfoName, Severity: meta.Severity, Tags: meta.Tags, Incomplete: len(issues) > 0, Issues: issues})
 		pe.tick(len(pocs), fmt.Sprintf("已扫描 %d 个 POC", len(pocs)))
 		return nil
 	})
@@ -330,6 +447,129 @@ func scanFingerprintPocs(ctx context.Context, pe *progressEmitter, dir string) (
 	}
 	sort.Slice(pocs, func(i, j int) bool { return pocs[i].RelPath < pocs[j].RelPath })
 	return pocs, nil
+}
+
+func parseFingerprintPocTemplateMeta(raw []byte) fingerprintPocTemplateMeta {
+	meta := fingerprintPocTemplateMeta{ID: extractTopLevelId(string(raw))}
+	var node yaml.Node
+	if err := yaml.Unmarshal(raw, &node); err != nil {
+		meta.ParseError = err.Error()
+		return meta
+	}
+	root := unwrapYAMLDoc(&node)
+	if root == nil || root.Kind != yaml.MappingNode {
+		meta.ParseError = "顶层不是 YAML mapping"
+		return meta
+	}
+	if id := yamlMapScalar(root, "id"); id != "" {
+		meta.ID = id
+	}
+	if info := yamlMapNode(root, "info"); info != nil && info.Kind == yaml.MappingNode {
+		meta.InfoName = yamlMapScalar(info, "name")
+		meta.Severity = yamlMapScalar(info, "severity")
+		meta.Tags = yamlStringList(yamlMapNode(info, "tags"))
+	}
+	for _, key := range []string{"requests", "http", "network", "dns", "ssl", "tcp", "udp", "websocket", "headless", "javascript", "code", "file"} {
+		if yamlMapNode(root, key) != nil {
+			meta.HasRequest = true
+			break
+		}
+	}
+	meta.HasMatcher = yamlContainsMapKey(root, "matchers")
+	meta.HasExtractor = yamlContainsMapKey(root, "extractors")
+	return meta
+}
+
+func fingerprintPocIncompleteIssues(meta fingerprintPocTemplateMeta) []string {
+	issues := []string{}
+	if meta.ParseError != "" {
+		issues = append(issues, "YAML 解析失败: "+meta.ParseError)
+	}
+	if meta.ID == "" {
+		issues = append(issues, "缺少顶层 id")
+	}
+	if meta.InfoName == "" {
+		issues = append(issues, "缺少 info.name")
+	}
+	if meta.Severity == "" {
+		issues = append(issues, "缺少 info.severity")
+	}
+	if !meta.HasRequest {
+		issues = append(issues, "缺少可执行请求块")
+	}
+	if !meta.HasMatcher && !meta.HasExtractor {
+		issues = append(issues, "缺少 matchers/extractors")
+	}
+	return issues
+}
+
+func yamlMapNode(node *yaml.Node, key string) *yaml.Node {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if strings.EqualFold(strings.TrimSpace(node.Content[i].Value), key) {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func yamlMapScalar(node *yaml.Node, key string) string {
+	child := yamlMapNode(node, key)
+	if child == nil {
+		return ""
+	}
+	return strings.TrimSpace(child.Value)
+}
+
+func yamlStringList(node *yaml.Node) []string {
+	if node == nil {
+		return nil
+	}
+	out := []string{}
+	switch node.Kind {
+	case yaml.SequenceNode:
+		for _, item := range node.Content {
+			for _, part := range strings.Split(item.Value, ",") {
+				part = strings.TrimSpace(part)
+				if part != "" {
+					out = append(out, part)
+				}
+			}
+		}
+	case yaml.ScalarNode:
+		for _, part := range strings.Split(node.Value, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				out = append(out, part)
+			}
+		}
+	}
+	return uniqueSortedStrings(out)
+}
+
+func yamlContainsMapKey(node *yaml.Node, key string) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == yaml.MappingNode {
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if strings.EqualFold(strings.TrimSpace(node.Content[i].Value), key) {
+				return true
+			}
+			if yamlContainsMapKey(node.Content[i+1], key) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, child := range node.Content {
+		if yamlContainsMapKey(child, key) {
+			return true
+		}
+	}
+	return false
 }
 
 func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo) *FingerprintAuditResult {
@@ -346,8 +586,13 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 		FingerWithoutWorkflow:   []string{},
 		WorkflowWithoutFinger:   []string{},
 		FingerWithoutPoc:        []string{},
+		PocWithFinger:           []FingerprintPocFingerMatch{},
+		PocWithFingerWorkflow:   []FingerprintPocFingerMatch{},
 		PocWithFingerNoWorkflow: []FingerprintPocFingerMatch{},
 		PocWithoutFinger:        []FingerprintPocInfo{},
+		VirtualPocs:             []FingerprintPocInfo{},
+		IncompletePocs:          []FingerprintPocInfo{},
+		AllPocs:                 []FingerprintPocInfo{},
 		WeakRules:               []FingerprintRuleIssue{},
 		DuplicateRules:          []FingerprintRuleDup{},
 		DuplicateProducts:       []FingerprintNameDup{},
@@ -442,6 +687,7 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 	}
 
 	referencedPocs := map[string]struct{}{}
+	referencedPocProducts := map[string]map[string]struct{}{}
 	for _, w := range workflows {
 		for _, poc := range w.Pocs {
 			key := normalizePocAuditKey(poc)
@@ -449,6 +695,10 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 				continue
 			}
 			referencedPocs[key] = struct{}{}
+			if referencedPocProducts[key] == nil {
+				referencedPocProducts[key] = map[string]struct{}{}
+			}
+			referencedPocProducts[key][w.Product] = struct{}{}
 			if _, ok := pocKeys[key]; !ok {
 				res.MissingPocCount++
 				if len(res.MissingPocs) < fingerprintAuditListLimit {
@@ -466,44 +716,60 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 		return res.MissingPocs[i].Product < res.MissingPocs[j].Product
 	})
 
-	for _, p := range pocs {
-		keys := []string{normalizePocAuditKey(strings.TrimSuffix(p.Name, filepath.Ext(p.Name)))}
-		if p.ID != "" {
-			keys = append(keys, normalizePocAuditKey(p.ID))
-		}
-		referenced := false
-		for _, key := range keys {
-			if _, ok := referencedPocs[key]; ok {
-				referenced = true
-				break
+	enrichedPocs := enrichFingerprintPocs(pocs, fingers, referencedPocProducts)
+	res.AllPocs = enrichedPocs
+	for _, p := range enrichedPocs {
+		if p.Incomplete {
+			res.IncompletePocCount++
+			if len(res.IncompletePocs) < fingerprintAuditListLimit {
+				res.IncompletePocs = append(res.IncompletePocs, p)
 			}
 		}
-		if !referenced {
+		if !p.ReferencedByWorkflow {
 			res.OrphanPocCount++
+			res.VirtualPocCount++
 			if len(res.OrphanPocs) < fingerprintAuditListLimit {
 				res.OrphanPocs = append(res.OrphanPocs, p)
 			}
-			if match, ok := bestFingerMatchForPoc(p, fingers); ok {
+			if len(res.VirtualPocs) < fingerprintAuditListLimit {
+				res.VirtualPocs = append(res.VirtualPocs, p)
+			}
+		}
+		if p.MatchedProduct != "" {
+			match := fingerprintPocInfoMatch(p)
+			res.PocWithFingerCount++
+			if len(res.PocWithFinger) < fingerprintAuditListLimit {
+				res.PocWithFinger = append(res.PocWithFinger, match)
+			}
+			if p.ReferencedByWorkflow {
+				res.PocWithFingerWorkflowCount++
+				if len(res.PocWithFingerWorkflow) < fingerprintAuditListLimit {
+					res.PocWithFingerWorkflow = append(res.PocWithFingerWorkflow, match)
+				}
+			} else {
 				res.PocWithFingerNoWorkflowCount++
 				if len(res.PocWithFingerNoWorkflow) < fingerprintAuditListLimit {
 					res.PocWithFingerNoWorkflow = append(res.PocWithFingerNoWorkflow, match)
 				}
-			} else {
-				res.PocWithoutFingerCount++
-				if len(res.PocWithoutFinger) < fingerprintAuditListLimit {
-					res.PocWithoutFinger = append(res.PocWithoutFinger, p)
-				}
+			}
+		} else {
+			res.PocWithoutFingerCount++
+			if len(res.PocWithoutFinger) < fingerprintAuditListLimit {
+				res.PocWithoutFinger = append(res.PocWithoutFinger, p)
 			}
 		}
 	}
+	sortFingerprintPocInfos(res.OrphanPocs)
+	sortFingerprintPocInfos(res.VirtualPocs)
+	sortFingerprintPocInfos(res.PocWithoutFinger)
+	sortFingerprintPocInfos(res.IncompletePocs)
+	sortFingerprintPocMatches(res.PocWithFinger)
+	sortFingerprintPocMatches(res.PocWithFingerWorkflow)
 	sort.Slice(res.PocWithFingerNoWorkflow, func(i, j int) bool {
 		if res.PocWithFingerNoWorkflow[i].Product == res.PocWithFingerNoWorkflow[j].Product {
 			return res.PocWithFingerNoWorkflow[i].PocRelPath < res.PocWithFingerNoWorkflow[j].PocRelPath
 		}
 		return res.PocWithFingerNoWorkflow[i].Product < res.PocWithFingerNoWorkflow[j].Product
-	})
-	sort.Slice(res.PocWithoutFinger, func(i, j int) bool {
-		return res.PocWithoutFinger[i].RelPath < res.PocWithoutFinger[j].RelPath
 	})
 
 	suggestedProducts := map[string]struct{}{}
@@ -585,6 +851,158 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 	return res
 }
 
+func buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo) *FingerprintPocCatalogResult {
+	referencedPocProducts := map[string]map[string]struct{}{}
+	workflowPocCountsByNorm := map[string]int{}
+	workflowRefCount := 0
+	for _, w := range workflows {
+		norm := normalizeFingerAuditName(w.Product)
+		workflowPocCountsByNorm[norm] += len(w.Pocs)
+		workflowRefCount += len(w.Pocs)
+		for _, poc := range w.Pocs {
+			key := normalizePocAuditKey(poc)
+			if key == "" {
+				continue
+			}
+			if referencedPocProducts[key] == nil {
+				referencedPocProducts[key] = map[string]struct{}{}
+			}
+			referencedPocProducts[key][w.Product] = struct{}{}
+		}
+	}
+	fingerRulesByNorm := map[string]int{}
+	fingerProductByNorm := map[string]string{}
+	for _, f := range fingers {
+		norm := normalizeFingerAuditName(f.Product)
+		fingerRulesByNorm[norm] += len(f.Rules)
+		if _, ok := fingerProductByNorm[norm]; !ok {
+			fingerProductByNorm[norm] = f.Product
+		}
+	}
+	enriched := enrichFingerprintPocs(pocs, fingers, referencedPocProducts)
+	res := &FingerprintPocCatalogResult{
+		ProjectRoot:      root,
+		FingerPath:       fingerPath,
+		WorkflowPath:     workflowPath,
+		PocDir:           pocDir,
+		FingerCount:      len(fingers),
+		WorkflowCount:    len(workflows),
+		PocFileCount:     len(enriched),
+		WorkflowPocCount: workflowRefCount,
+		AllPocs:          enriched,
+		Groups:           []FingerprintPocComponentGroup{},
+		UnmatchedPocs:    []FingerprintPocInfo{},
+		VirtualPocs:      []FingerprintPocInfo{},
+		IncompletePocs:   []FingerprintPocInfo{},
+	}
+	groupByNorm := map[string]*FingerprintPocComponentGroup{}
+	for _, p := range enriched {
+		if p.Incomplete {
+			res.IncompletePocCount++
+			res.IncompletePocs = append(res.IncompletePocs, p)
+		}
+		if !p.ReferencedByWorkflow {
+			res.VirtualPocCount++
+			res.VirtualPocs = append(res.VirtualPocs, p)
+		}
+		if p.MatchedProduct == "" {
+			res.UnmatchedPocCount++
+			res.UnmatchedPocs = append(res.UnmatchedPocs, p)
+			continue
+		}
+		res.ClassifiedPocCount++
+		norm := normalizeFingerAuditName(p.MatchedProduct)
+		g := groupByNorm[norm]
+		if g == nil {
+			product := fingerProductByNorm[norm]
+			if product == "" {
+				product = p.MatchedProduct
+			}
+			g = &FingerprintPocComponentGroup{Product: product, NormalizedProduct: norm, FingerRuleCount: fingerRulesByNorm[norm], WorkflowPocCount: workflowPocCountsByNorm[norm], Pocs: []FingerprintPocInfo{}}
+			groupByNorm[norm] = g
+		}
+		g.Pocs = append(g.Pocs, p)
+		g.PocCount++
+		if p.ReferencedByWorkflow {
+			g.ReferencedPocCount++
+		} else {
+			g.UnreferencedPocCount++
+		}
+		if p.Incomplete {
+			g.IncompletePocCount++
+		}
+	}
+	for _, g := range groupByNorm {
+		sortFingerprintPocInfos(g.Pocs)
+		res.Groups = append(res.Groups, *g)
+	}
+	sort.Slice(res.Groups, func(i, j int) bool {
+		if res.Groups[i].PocCount == res.Groups[j].PocCount {
+			return res.Groups[i].Product < res.Groups[j].Product
+		}
+		return res.Groups[i].PocCount > res.Groups[j].PocCount
+	})
+	res.ComponentCount = len(res.Groups)
+	sortFingerprintPocInfos(res.UnmatchedPocs)
+	sortFingerprintPocInfos(res.VirtualPocs)
+	sortFingerprintPocInfos(res.IncompletePocs)
+	return res
+}
+
+func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, referenced map[string]map[string]struct{}) []FingerprintPocInfo {
+	out := make([]FingerprintPocInfo, 0, len(pocs))
+	for _, p := range pocs {
+		cp := p
+		productSet := map[string]struct{}{}
+		for _, key := range pocAuditKeys(p) {
+			for product := range referenced[key] {
+				productSet[product] = struct{}{}
+			}
+		}
+		cp.WorkflowProducts = sortedKeys(productSet)
+		cp.ReferencedByWorkflow = len(cp.WorkflowProducts) > 0
+		if match, ok := bestFingerMatchForPoc(cp, fingers); ok {
+			cp.MatchedProduct = match.Product
+			cp.MatchConfidence = match.Confidence
+			cp.MatchReason = match.Reason
+		}
+		out = append(out, cp)
+	}
+	sortFingerprintPocInfos(out)
+	return out
+}
+
+func pocAuditKeys(p FingerprintPocInfo) []string {
+	keys := []string{normalizePocAuditKey(strings.TrimSuffix(p.Name, filepath.Ext(p.Name)))}
+	if p.ID != "" {
+		keys = append(keys, normalizePocAuditKey(p.ID))
+	}
+	return uniqueSortedStrings(keys)
+}
+
+func fingerprintPocInfoMatch(p FingerprintPocInfo) FingerprintPocFingerMatch {
+	pocName := strings.TrimSuffix(p.Name, filepath.Ext(p.Name))
+	if p.ID != "" {
+		pocName = p.ID
+	}
+	return FingerprintPocFingerMatch{Product: p.MatchedProduct, Poc: pocName, PocID: p.ID, PocRelPath: p.RelPath, Confidence: p.MatchConfidence, Reason: p.MatchReason, Path: p.Path}
+}
+
+func sortFingerprintPocInfos(items []FingerprintPocInfo) {
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].RelPath < items[j].RelPath
+	})
+}
+
+func sortFingerprintPocMatches(items []FingerprintPocFingerMatch) {
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Product == items[j].Product {
+			return items[i].PocRelPath < items[j].PocRelPath
+		}
+		return items[i].Product < items[j].Product
+	})
+}
+
 func appendLimitedRuleIssue(items []FingerprintRuleIssue, issue FingerprintRuleIssue) []FingerprintRuleIssue {
 	if len(items) >= fingerprintAuditListLimit {
 		return items
@@ -654,7 +1072,11 @@ func workflowSuggestionScore(productNorm string, poc FingerprintPocInfo) (int, s
 	candidates := []string{
 		normalizeFingerAuditName(strings.TrimSuffix(poc.Name, filepath.Ext(poc.Name))),
 		normalizeFingerAuditName(poc.ID),
+		normalizeFingerAuditName(poc.InfoName),
 		normalizeFingerAuditName(poc.RelPath),
+	}
+	for _, tag := range poc.Tags {
+		candidates = append(candidates, normalizeFingerAuditName(tag))
 	}
 	best := 0
 	reason := ""
