@@ -66,7 +66,10 @@ func (a *App) ClassifyExternalPocsByDDDD(projectRoot, sourceDir string) (*Finger
 	unique, duplicates := dedupeFingerprintPocs(pocs)
 	pe.switchPhase("analyzing", len(unique))
 	pe.forceEmit(0, fmt.Sprintf("按产品指纹归类 %d 个唯一 POC", len(unique)))
-	res := buildFingerprintPocCatalog(root, fingerPath, workflowPath, source, fingers, workflows, unique, pe)
+	res, err := buildFingerprintPocCatalog(root, fingerPath, workflowPath, source, fingers, workflows, unique, pe)
+	if err != nil {
+		return nil, err
+	}
 	res.SourceType = "external"
 	res.SourceDir = source
 	res.PocFileCount = len(pocs)

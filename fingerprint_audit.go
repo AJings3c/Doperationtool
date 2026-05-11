@@ -259,7 +259,10 @@ func (a *App) AuditFingerprintKnowledge(projectRoot string) (*FingerprintAuditRe
 
 	pe.switchPhase("analyzing", len(pocs))
 	pe.forceEmit(0, fmt.Sprintf("分析 %d 个 POC 与 %d 个指纹产品", len(pocs), len(fingers)))
-	res := buildFingerprintAudit(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, pe)
+	res, err := buildFingerprintAudit(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, pe)
+	if err != nil {
+		return nil, err
+	}
 	res.Elapsed = time.Since(start).Truncate(10 * time.Millisecond).String()
 	return res, nil
 }
@@ -311,7 +314,10 @@ func (a *App) ClassifyDDDDBuiltinPocs(projectRoot string) (*FingerprintPocCatalo
 	}
 	pe.switchPhase("analyzing", len(pocs))
 	pe.forceEmit(0, fmt.Sprintf("按组件指纹归类 %d 个 POC", len(pocs)))
-	res := buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, pe)
+	res, err := buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, pe)
+	if err != nil {
+		return nil, err
+	}
 	res.Elapsed = time.Since(start).Truncate(10 * time.Millisecond).String()
 	return res, nil
 }
@@ -595,7 +601,7 @@ func yamlContainsMapKey(node *yaml.Node, key string) bool {
 	return false
 }
 
-func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, pe *progressEmitter) *FingerprintAuditResult {
+func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, pe *progressEmitter) (*FingerprintAuditResult, error) {
 	res := &FingerprintAuditResult{
 		ProjectRoot:             root,
 		FingerPath:              fingerPath,
@@ -739,7 +745,10 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 		return res.MissingPocs[i].Product < res.MissingPocs[j].Product
 	})
 
-	enrichedPocs := enrichFingerprintPocs(pocs, fingers, referencedPocProducts, pe, "匹配 POC 与指纹")
+	enrichedPocs, err := enrichFingerprintPocs(pocs, fingers, referencedPocProducts, pe, "匹配 POC 与指纹")
+	if err != nil {
+		return nil, err
+	}
 	res.AllPocs = enrichedPocs
 	for _, p := range enrichedPocs {
 		if p.Incomplete {
@@ -788,7 +797,9 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 	sortFingerprintPocInfos(res.IncompletePocs)
 	sortFingerprintPocMatches(res.PocWithFinger)
 	sortFingerprintPocMatches(res.PocWithFingerWorkflow)
-	if catalog := buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, enrichedPocs, nil); catalog != nil {
+	if catalog, err := buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, enrichedPocs, nil); err != nil {
+		return nil, err
+	} else if catalog != nil {
 		res.PocGroups = catalog.Groups
 		res.ClassifiedPocCount = catalog.ClassifiedPocCount
 		res.UnmatchedPocCount = catalog.UnmatchedPocCount
@@ -807,6 +818,9 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 		pe.forceEmit(0, fmt.Sprintf("检查 %d 个指纹产品的 workflow 与 POC 覆盖", len(fingers)))
 	}
 	for i, f := range fingers {
+		if progressCancelled(pe) {
+			return nil, fmt.Errorf("已取消")
+		}
 		norm := normalizeFingerAuditName(f.Product)
 		if workflowResolvedPocCountsByNorm[norm] == 0 {
 			res.FingerWithoutPocCount++
@@ -819,7 +833,9 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 			if len(res.FingerWithoutWorkflow) < fingerprintAuditListLimit {
 				res.FingerWithoutWorkflow = append(res.FingerWithoutWorkflow, f.Product)
 			}
-			if s, ok := bestWorkflowSuggestionForProduct(f.Product, pocs, referencedPocs); ok {
+			if s, ok, err := bestWorkflowSuggestionForProduct(f.Product, pocs, referencedPocs, pe); err != nil {
+				return nil, err
+			} else if ok {
 				res.WorkflowSuggestionCount++
 				suggestedProducts[norm] = struct{}{}
 				if len(res.WorkflowSuggestions) < fingerprintAuditListLimit {
@@ -884,14 +900,14 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 		res.TopFingerProducts = res.TopFingerProducts[:50]
 	}
 
-	return res
+	return res, nil
 }
 
-func buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, pe *progressEmitter) *FingerprintPocCatalogResult {
+func buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, pe *progressEmitter) (*FingerprintPocCatalogResult, error) {
 	return buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, nil, pe)
 }
 
-func buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, enriched []FingerprintPocInfo, pe *progressEmitter) *FingerprintPocCatalogResult {
+func buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, enriched []FingerprintPocInfo, pe *progressEmitter) (*FingerprintPocCatalogResult, error) {
 	referencedPocProducts := map[string]map[string]struct{}{}
 	workflowPocCountsByNorm := map[string]int{}
 	workflowRefCount := 0
@@ -920,7 +936,11 @@ func buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocD
 		}
 	}
 	if enriched == nil {
-		enriched = enrichFingerprintPocs(pocs, fingers, referencedPocProducts, pe, "匹配 POC 与指纹")
+		var err error
+		enriched, err = enrichFingerprintPocs(pocs, fingers, referencedPocProducts, pe, "匹配 POC 与指纹")
+		if err != nil {
+			return nil, err
+		}
 	}
 	res := &FingerprintPocCatalogResult{
 		ProjectRoot:      root,
@@ -939,6 +959,9 @@ func buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocD
 	}
 	groupByNorm := map[string]*FingerprintPocComponentGroup{}
 	for _, p := range enriched {
+		if progressCancelled(pe) {
+			return nil, fmt.Errorf("已取消")
+		}
 		if p.Incomplete {
 			res.IncompletePocCount++
 			res.IncompletePocs = append(res.IncompletePocs, p)
@@ -988,12 +1011,15 @@ func buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocD
 	sortFingerprintPocInfos(res.UnmatchedPocs)
 	sortFingerprintPocInfos(res.VirtualPocs)
 	sortFingerprintPocInfos(res.IncompletePocs)
-	return res
+	return res, nil
 }
 
-func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, referenced map[string]map[string]struct{}, pe *progressEmitter, label string) []FingerprintPocInfo {
+func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, referenced map[string]map[string]struct{}, pe *progressEmitter, label string) ([]FingerprintPocInfo, error) {
 	out := make([]FingerprintPocInfo, 0, len(pocs))
 	for i, p := range pocs {
+		if progressCancelled(pe) {
+			return nil, fmt.Errorf("已取消")
+		}
 		cp := p
 		productSet := map[string]struct{}{}
 		for _, key := range pocAuditKeys(p) {
@@ -1003,7 +1029,9 @@ func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, ref
 		}
 		cp.WorkflowProducts = sortedKeys(productSet)
 		cp.ReferencedByWorkflow = len(cp.WorkflowProducts) > 0
-		if match, ok := bestFingerMatchForPoc(cp, fingers); ok {
+		if match, ok, err := bestFingerMatchForPoc(cp, fingers, pe); err != nil {
+			return nil, err
+		} else if ok {
 			cp.MatchedProduct = match.Product
 			cp.MatchConfidence = match.Confidence
 			cp.MatchReason = match.Reason
@@ -1014,7 +1042,7 @@ func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, ref
 		}
 	}
 	sortFingerprintPocInfos(out)
-	return out
+	return out, nil
 }
 
 func pocAuditKeys(p FingerprintPocInfo) []string {
@@ -1055,14 +1083,21 @@ func appendLimitedRuleIssue(items []FingerprintRuleIssue, issue FingerprintRuleI
 	return append(items, issue)
 }
 
-func bestWorkflowSuggestionForProduct(product string, pocs []FingerprintPocInfo, referenced map[string]struct{}) (FingerprintWorkflowSuggestion, bool) {
+func progressCancelled(pe *progressEmitter) bool {
+	return pe != nil && pe.ctx != nil && pe.ctx.Err() != nil
+}
+
+func bestWorkflowSuggestionForProduct(product string, pocs []FingerprintPocInfo, referenced map[string]struct{}, pe *progressEmitter) (FingerprintWorkflowSuggestion, bool, error) {
 	prodNorm := normalizeFingerAuditName(product)
 	if prodNorm == "" {
-		return FingerprintWorkflowSuggestion{}, false
+		return FingerprintWorkflowSuggestion{}, false, nil
 	}
 	best := FingerprintWorkflowSuggestion{}
 	bestScore := 0
 	for _, poc := range pocs {
+		if progressCancelled(pe) {
+			return FingerprintWorkflowSuggestion{}, false, fmt.Errorf("已取消")
+		}
 		keys := []string{normalizePocAuditKey(strings.TrimSuffix(poc.Name, filepath.Ext(poc.Name)))}
 		if poc.ID != "" {
 			keys = append(keys, normalizePocAuditKey(poc.ID))
@@ -1088,15 +1123,18 @@ func bestWorkflowSuggestionForProduct(product string, pocs []FingerprintPocInfo,
 		}
 	}
 	if bestScore < 55 {
-		return FingerprintWorkflowSuggestion{}, false
+		return FingerprintWorkflowSuggestion{}, false, nil
 	}
-	return best, true
+	return best, true, nil
 }
 
-func bestFingerMatchForPoc(poc FingerprintPocInfo, fingers []fingerEntry) (FingerprintPocFingerMatch, bool) {
+func bestFingerMatchForPoc(poc FingerprintPocInfo, fingers []fingerEntry, pe *progressEmitter) (FingerprintPocFingerMatch, bool, error) {
 	best := FingerprintPocFingerMatch{}
 	bestScore := 0
 	for _, f := range fingers {
+		if progressCancelled(pe) {
+			return FingerprintPocFingerMatch{}, false, fmt.Errorf("已取消")
+		}
 		score, reason := workflowSuggestionScore(normalizeFingerAuditName(f.Product), poc)
 		if score > bestScore {
 			bestScore = score
@@ -1108,9 +1146,9 @@ func bestFingerMatchForPoc(poc FingerprintPocInfo, fingers []fingerEntry) (Finge
 		}
 	}
 	if bestScore < 55 {
-		return FingerprintPocFingerMatch{}, false
+		return FingerprintPocFingerMatch{}, false, nil
 	}
-	return best, true
+	return best, true, nil
 }
 
 func workflowSuggestionScore(productNorm string, poc FingerprintPocInfo) (int, string) {

@@ -310,6 +310,11 @@ const progressTracker = (() => {
     return { start, stop };
 })();
 
+function isTaskCancelledError(err) {
+    const msg = String(err || '').toLowerCase();
+    return msg.includes('已取消') || msg.includes('context canceled') || msg.includes('cancelled') || msg.includes('canceled');
+}
+
 // ============ 侧栏: 模块折叠 / 右边缘拖动 resize ============
 document.querySelectorAll('.module-item[data-tool]').forEach((el) => {
     el.addEventListener('click', (e) => {
@@ -5213,8 +5218,13 @@ function setupPocCatalog() {
             toast(score > 0 ? `⚠️ 归类完成: 发现 ${score} 个重点问题 (${r.elapsed})` : `✅ 归类完成 (${r.elapsed})`, score > 0 ? 'error' : 'success');
         } catch (err) {
             const msg = String(err);
-            elResult.innerHTML = `<div class="poc-validate-fail">❌ 归类失败: ${escapeHtml(msg)}</div>`;
-            toast(msg, 'error');
+            if (isTaskCancelledError(err)) {
+                elResult.innerHTML = `<div class="yaml-empty">已取消外部 POC 归类。</div>`;
+                toast('已取消外部 POC 归类', 'info');
+            } else {
+                elResult.innerHTML = `<div class="poc-validate-fail">❌ 归类失败: ${escapeHtml(msg)}</div>`;
+                toast(msg, 'error');
+            }
             progressTracker.stop();
         } finally {
             elRun.disabled = false;
@@ -5291,8 +5301,13 @@ function setupFingerprintGovernance() {
             toast(score > 0 ? `⚠️ 审计完成: 发现 ${score} 个重点问题 (${r.elapsed})` : `✅ 审计完成 (${r.elapsed})`, score > 0 ? 'error' : 'success');
         } catch (err) {
             const msg = String(err);
-            elResult.innerHTML = `<div class="poc-validate-fail">❌ 审计失败: ${escapeHtml(msg)}</div>`;
-            toast(msg, 'error');
+            if (isTaskCancelledError(err)) {
+                elResult.innerHTML = `<div class="yaml-empty">已取消 dddd 能力对比审计。</div>`;
+                toast('已取消 dddd 能力对比审计', 'info');
+            } else {
+                elResult.innerHTML = `<div class="poc-validate-fail">❌ 审计失败: ${escapeHtml(msg)}</div>`;
+                toast(msg, 'error');
+            }
             progressTracker.stop();
         } finally {
             elRun.disabled = false;
