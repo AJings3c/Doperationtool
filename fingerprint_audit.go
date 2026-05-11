@@ -257,9 +257,9 @@ func (a *App) AuditFingerprintKnowledge(projectRoot string) (*FingerprintAuditRe
 		return nil, fmt.Errorf("已取消")
 	}
 
-	pe.switchPhase("analyzing", 0)
-	pe.forceEmit(0, "分析指纹 / workflow / POC 关联")
-	res := buildFingerprintAudit(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs)
+	pe.switchPhase("analyzing", len(pocs))
+	pe.forceEmit(0, fmt.Sprintf("分析 %d 个 POC 与 %d 个指纹产品", len(pocs), len(fingers)))
+	res := buildFingerprintAudit(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, pe)
 	res.Elapsed = time.Since(start).Truncate(10 * time.Millisecond).String()
 	return res, nil
 }
@@ -309,9 +309,9 @@ func (a *App) ClassifyDDDDBuiltinPocs(projectRoot string) (*FingerprintPocCatalo
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("已取消")
 	}
-	pe.switchPhase("analyzing", 0)
-	pe.forceEmit(0, "按组件指纹归类 POC")
-	res := buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs)
+	pe.switchPhase("analyzing", len(pocs))
+	pe.forceEmit(0, fmt.Sprintf("按组件指纹归类 %d 个 POC", len(pocs)))
+	res := buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, pe)
 	res.Elapsed = time.Since(start).Truncate(10 * time.Millisecond).String()
 	return res, nil
 }
@@ -595,7 +595,7 @@ func yamlContainsMapKey(node *yaml.Node, key string) bool {
 	return false
 }
 
-func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo) *FingerprintAuditResult {
+func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, pe *progressEmitter) *FingerprintAuditResult {
 	res := &FingerprintAuditResult{
 		ProjectRoot:             root,
 		FingerPath:              fingerPath,
@@ -739,7 +739,7 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 		return res.MissingPocs[i].Product < res.MissingPocs[j].Product
 	})
 
-	enrichedPocs := enrichFingerprintPocs(pocs, fingers, referencedPocProducts)
+	enrichedPocs := enrichFingerprintPocs(pocs, fingers, referencedPocProducts, pe, "匹配 POC 与指纹")
 	res.AllPocs = enrichedPocs
 	for _, p := range enrichedPocs {
 		if p.Incomplete {
@@ -788,7 +788,7 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 	sortFingerprintPocInfos(res.IncompletePocs)
 	sortFingerprintPocMatches(res.PocWithFinger)
 	sortFingerprintPocMatches(res.PocWithFingerWorkflow)
-	if catalog := buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs); catalog != nil {
+	if catalog := buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, enrichedPocs, nil); catalog != nil {
 		res.PocGroups = catalog.Groups
 		res.ClassifiedPocCount = catalog.ClassifiedPocCount
 		res.UnmatchedPocCount = catalog.UnmatchedPocCount
@@ -802,7 +802,11 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 	})
 
 	suggestedProducts := map[string]struct{}{}
-	for _, f := range fingers {
+	if pe != nil {
+		pe.switchPhase("analyzing", len(fingers))
+		pe.forceEmit(0, fmt.Sprintf("检查 %d 个指纹产品的 workflow 与 POC 覆盖", len(fingers)))
+	}
+	for i, f := range fingers {
 		norm := normalizeFingerAuditName(f.Product)
 		if workflowResolvedPocCountsByNorm[norm] == 0 {
 			res.FingerWithoutPocCount++
@@ -822,6 +826,9 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 					res.WorkflowSuggestions = append(res.WorkflowSuggestions, s)
 				}
 			}
+		}
+		if pe != nil {
+			pe.tick(i+1, fmt.Sprintf("已检查 %d/%d 个指纹产品", i+1, len(fingers)))
 		}
 	}
 	for _, w := range workflows {
@@ -880,7 +887,11 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 	return res
 }
 
-func buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo) *FingerprintPocCatalogResult {
+func buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, pe *progressEmitter) *FingerprintPocCatalogResult {
+	return buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs, nil, pe)
+}
+
+func buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocDir string, fingers []fingerEntry, workflows []workflowEntry, pocs []FingerprintPocInfo, enriched []FingerprintPocInfo, pe *progressEmitter) *FingerprintPocCatalogResult {
 	referencedPocProducts := map[string]map[string]struct{}{}
 	workflowPocCountsByNorm := map[string]int{}
 	workflowRefCount := 0
@@ -908,7 +919,9 @@ func buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir string, f
 			fingerProductByNorm[norm] = f.Product
 		}
 	}
-	enriched := enrichFingerprintPocs(pocs, fingers, referencedPocProducts)
+	if enriched == nil {
+		enriched = enrichFingerprintPocs(pocs, fingers, referencedPocProducts, pe, "匹配 POC 与指纹")
+	}
 	res := &FingerprintPocCatalogResult{
 		ProjectRoot:      root,
 		FingerPath:       fingerPath,
@@ -978,9 +991,9 @@ func buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir string, f
 	return res
 }
 
-func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, referenced map[string]map[string]struct{}) []FingerprintPocInfo {
+func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, referenced map[string]map[string]struct{}, pe *progressEmitter, label string) []FingerprintPocInfo {
 	out := make([]FingerprintPocInfo, 0, len(pocs))
-	for _, p := range pocs {
+	for i, p := range pocs {
 		cp := p
 		productSet := map[string]struct{}{}
 		for _, key := range pocAuditKeys(p) {
@@ -996,6 +1009,9 @@ func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, ref
 			cp.MatchReason = match.Reason
 		}
 		out = append(out, cp)
+		if pe != nil {
+			pe.tick(i+1, fmt.Sprintf("%s %d/%d", label, i+1, len(pocs)))
+		}
 	}
 	sortFingerprintPocInfos(out)
 	return out

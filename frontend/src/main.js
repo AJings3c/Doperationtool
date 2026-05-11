@@ -161,6 +161,8 @@ const progressTracker = (() => {
     let cancelFn = null;        // EventsOn 返回的 cancel
     // 自动收起 timer: 后端 emit Done=true 后 800ms 隐藏卡片, 让用户看到 100% 一会儿
     let hideTimer = null;
+    let elapsedTimer = null;
+    let startedAt = 0;
     // 用户点过取消按钮 → 后续 update 不再覆盖 label, 防止 indeterminate 心跳消息盖掉"取消中…"
     let cancelRequested = false;
 
@@ -177,13 +179,29 @@ const progressTracker = (() => {
         auditing:   '审计中',
     };
 
+    function formatElapsed(ms) {
+        if (ms < 1000) return `${Math.max(0, Math.floor(ms / 100) * 100)}ms`;
+        if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+        const sec = Math.floor(ms / 1000);
+        const min = Math.floor(sec / 60);
+        const rest = String(sec % 60).padStart(2, '0');
+        return `${min}m ${rest}s`;
+    }
+
+    function refreshElapsed() {
+        if (!startedAt) return;
+        elElapsed().textContent = formatElapsed(Date.now() - startedAt);
+    }
+
     function show(title) {
         const c = elCard();
         if (!c) return;
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+        startedAt = Date.now();
         cancelRequested = false;
         elTitle().textContent = title || '处理中';
-        elElapsed().textContent = '';
+        refreshElapsed();
         elPhase().textContent = '';
         elLabel().textContent = '';
         const fill = elFill();
@@ -195,12 +213,17 @@ const progressTracker = (() => {
             cancel.textContent = '✕';
         }
         c.hidden = false;
+        elapsedTimer = setInterval(refreshElapsed, 100);
     }
 
     function update(p) {
         if (!p || typeof p !== 'object') return;
         const fill = elFill();
-        elElapsed().textContent = p.elapsed || '';
+        if (p.done) {
+            elElapsed().textContent = p.elapsed || elElapsed().textContent;
+        } else {
+            refreshElapsed();
+        }
         elPhase().textContent = phaseLabels[p.phase] || p.phase || '';
         // 用户点取消后, 期间收到的"取消中…"以外的 indeterminate 心跳别盖回去
         if (!cancelRequested) {
@@ -216,6 +239,7 @@ const progressTracker = (() => {
             fill.style.width = pct.toFixed(1) + '%';
         }
         if (p.done) {
+            if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
             fill.classList.remove('indeterminate');
             fill.style.width = '100%';
             if (p.cancelled) {
@@ -269,6 +293,8 @@ const progressTracker = (() => {
 
     function stop() {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+        startedAt = 0;
         if (cancelFn) { try { cancelFn(); } catch (e) {} cancelFn = null; }
         if (currentEvent) {
             try { EventsOff(currentEvent); } catch (e) {}
