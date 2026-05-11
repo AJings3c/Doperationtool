@@ -114,8 +114,8 @@ document.querySelector('#app').innerHTML = `
         <li class="module-item" data-tool="template-dedup"><span class="module-icon">D</span><span class="module-label">模板去重</span></li>
         <li class="module-item" data-tool="template-classify"><span class="module-icon">C</span><span class="module-label">模板分类</span></li>
         <li class="module-item" data-tool="yaml-collect"><span class="module-icon">G</span><span class="module-label">YAML 采集</span></li>
-        <li class="module-item" data-tool="fingerprint-governance"><span class="module-icon">A</span><span class="module-label">指纹治理</span></li>
-        <li class="module-item" data-tool="poc-catalog"><span class="module-icon">K</span><span class="module-label">POC 归类</span></li>
+        <li class="module-item" data-tool="fingerprint-governance"><span class="module-icon">A</span><span class="module-label">dddd 能力对比</span></li>
+        <li class="module-item" data-tool="poc-catalog"><span class="module-icon">K</span><span class="module-label">dddd POC归类</span></li>
     </ul>
     <div class="sidebar-footer">© 2026 Doperationtool</div>
     <div class="sidebar-resizer" id="sidebar-resizer" title="拖动调整宽度"></div>
@@ -5046,14 +5046,15 @@ function renderFingerprintGovernance(container) {
     container.innerHTML = `
     <div class="fingerprint-governance">
         <div class="extractor-tip">
-            🧬 对 dddd 指纹知识库做只读审计: 检查 <code>common/config/finger.yaml</code>、
-            <code>workflow.yaml</code> 与 <code>config/pocs</code> 的覆盖关系、缺失、孤儿和高风险泛化规则。
+            🧬 这里检查 dddd 的指纹与 POC 能力: 对比 <code>common/config/finger.yaml</code>、
+            <code>workflow.yaml</code> 与 <code>config/pocs</code>，找出有指纹无 POC、有 POC 无指纹、虚空 POC、残缺 POC 和 workflow 不可调用问题。
         </div>
         <div class="nv-toolbar">
             <input type="text" class="yaml-path-input" id="fg-root"
                 placeholder="选择 dddd 根目录, 例如 D:\\AI\\scan\\dddd" spellcheck="false" />
             <button class="btn" id="fg-pick">选择目录</button>
             <button class="btn" id="fg-open-converter">指纹转换</button>
+            <button class="btn" id="fg-open-poc-catalog">POC 按指纹归类</button>
             <button class="btn btn-primary" id="fg-run">▶️ 开始审计</button>
         </div>
         <div class="nv-history" id="fg-history"></div>
@@ -5067,14 +5068,14 @@ function renderPocCatalog(container) {
     container.innerHTML = `
     <div class="fingerprint-governance poc-catalog">
         <div class="extractor-tip">
-            🧩 扫描 dddd <code>common/config/pocs</code> 下所有内置 POC，按 <code>finger.yaml</code> 组件指纹归类，并标出未进 workflow 的虚空 POC、未匹配指纹 POC 和残缺 POC。
+            🧩 这里加载 dddd <code>common/config/pocs</code> 下所有内置 POC，并按 <code>finger.yaml</code> 的组件指纹自动归类；同时标出未进 workflow 的虚空 POC、未匹配指纹 POC 和残缺 POC。
         </div>
         <div class="nv-toolbar">
             <input type="text" class="yaml-path-input" id="pc-root"
                 placeholder="选择 dddd 根目录, 例如 D:\\AI\\scan\\dddd" spellcheck="false" />
             <button class="btn" id="pc-pick">选择目录</button>
-            <button class="btn" id="pc-open-audit">能力对比</button>
-            <button class="btn btn-primary" id="pc-run">▶️ 开始归类</button>
+            <button class="btn" id="pc-open-audit">指纹/POC 能力对比</button>
+            <button class="btn btn-primary" id="pc-run">▶️ 加载并按指纹归类</button>
         </div>
         <div class="nv-history" id="pc-history"></div>
         <div class="fg-summary" id="pc-summary"></div>
@@ -5170,6 +5171,7 @@ function setupFingerprintGovernance() {
     const elRoot = document.getElementById('fg-root');
     const elPick = document.getElementById('fg-pick');
     const elConverter = document.getElementById('fg-open-converter');
+    const elPocCatalog = document.getElementById('fg-open-poc-catalog');
     const elRun = document.getElementById('fg-run');
     const elHist = document.getElementById('fg-history');
     const elSummary = document.getElementById('fg-summary');
@@ -5210,6 +5212,11 @@ function setupFingerprintGovernance() {
         const root = elRoot.value.trim();
         if (root) pushFingerHistory('history', 'root', root);
         navigate('dddd-fingerprint-converter');
+    });
+    elPocCatalog.addEventListener('click', () => {
+        const root = elRoot.value.trim();
+        if (root) pushFingerHistory('history', 'root', root);
+        navigate('poc-catalog');
     });
     elResult.addEventListener('click', (e) => {
         const btn = e.target.closest && e.target.closest('.fg-reveal');
@@ -5568,8 +5575,8 @@ const routes = {
     'template-dedup':    { module: '辅助模块', name: '模板去重',     render: renderTemplateDedup   },
     'template-classify': { module: '辅助模块', name: '模板分类',     render: renderTemplateClassify },
     'yaml-collect':      { module: '辅助模块', name: 'YAML 采集',    render: renderYamlCollect     },
-    'fingerprint-governance': { module: '辅助模块', name: '指纹治理', render: renderFingerprintGovernance },
-    'poc-catalog':       { module: '辅助模块', name: 'POC 归类',     render: renderPocCatalog      },
+    'fingerprint-governance': { module: '辅助模块', name: 'dddd 能力对比', render: renderFingerprintGovernance },
+    'poc-catalog':       { module: '辅助模块', name: 'dddd POC归类', render: renderPocCatalog      },
     'yaml-converter':    { module: '转换模块', name: 'YAML 转换',    render: renderYamlConverter   },
     'dddd-fingerprint-converter': { module: '转换模块', name: '指纹转换', render: renderDDDDFingerprintConverter },
     'poc-converter':     { module: '转换模块', name: 'POC 转换', render: renderPocConverter    },
