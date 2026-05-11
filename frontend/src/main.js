@@ -5075,13 +5075,15 @@ function renderFingerprintGovernance(container) {
             🧬 这里检查 dddd 的指纹与 POC 能力: 对比 <code>common/config/finger.yaml</code>、
             <code>workflow.yaml</code> 与 <code>config/pocs</code>，找出有指纹无 POC、有 POC 无指纹、虚空 POC、残缺 POC 和 workflow 不可调用问题。
         </div>
-        <div class="nv-toolbar">
-            <input type="text" class="yaml-path-input" id="fg-root"
-                placeholder="选择 dddd 根目录, 例如 D:\\AI\\scan\\dddd" spellcheck="false" />
-            <button class="btn" id="fg-pick">选择目录</button>
-            <button class="btn btn-primary" id="fg-run">▶️ 开始审计</button>
+        <div class="fg-control-card">
+            <div class="nv-toolbar">
+                <input type="text" class="yaml-path-input" id="fg-root"
+                    placeholder="选择 dddd 根目录, 例如 D:\\AI\\scan\\dddd" spellcheck="false" />
+                <button class="btn" id="fg-pick">选择目录</button>
+                <button class="btn btn-primary" id="fg-run">▶️ 开始审计</button>
+            </div>
+            <div class="nv-history" id="fg-history"></div>
         </div>
-        <div class="nv-history" id="fg-history"></div>
         <div class="fg-summary" id="fg-summary"></div>
         <div class="fg-result" id="fg-result"></div>
     </div>`;
@@ -5421,10 +5423,11 @@ function renderPocDuplicateTable(title, total, items) {
             <td title="${escapeHtml(x.key || '')}">${escapeHtml(x.key || '')}</td>
         </tr>`).join('');
     const body = rows ? `
+        <div class="fg-table-wrap">
         <table class="fg-table">
             <thead><tr><th>原因</th><th>保留</th><th>重复</th><th>去重键</th></tr></thead>
             <tbody>${rows}</tbody>
-        </table>` : '';
+        </table></div>` : '';
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
@@ -5467,10 +5470,11 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
         </tr>`;
     }).join('');
     const itemsBody = itemRows ? `
+        <div class="fg-table-wrap">
         <table class="fg-table fg-import-items">
             <thead><tr><th>产品</th><th>归一化</th><th>质量</th><th>规则</th><th>来源</th><th>规则示例</th><th>提示</th></tr></thead>
             <tbody>${itemRows}</tbody>
-        </table>` : '';
+        </table></div>` : '';
 
     const mergeBody = renderFingerprintTable('合并建议', r.mergeSuggestionCount, r.mergeSuggestions, ['归一化名称', '已有产品', '导入产品'], (x) => [
         x.normalizedProduct,
@@ -5522,8 +5526,9 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
 
 function renderFingerprintSection(title, total, body, shown = 0) {
     const suffix = total > shown ? ` · 显示前 ${shown} 条` : '';
+    const open = (total || 0) > 0 ? 'open' : '';
     return `
-    <details class="fg-section" open>
+    <details class="fg-section" ${open}>
         <summary>${escapeHtml(title)} <span>${escapeHtml(total || 0)}${escapeHtml(suffix)}</span></summary>
         ${body || '<div class="fg-empty">暂无问题</div>'}
     </details>`;
@@ -5536,10 +5541,11 @@ function renderFingerprintTable(title, total, items, headers, rowFn) {
         return `<tr>${cols}</tr>`;
     }).join('');
     const body = rows ? `
+        <div class="fg-table-wrap">
         <table class="fg-table">
             <thead><tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
             <tbody>${rows}</tbody>
-        </table>` : '';
+        </table></div>` : '';
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
@@ -5552,10 +5558,11 @@ function renderFingerprintPocTable(title, total, items) {
             <td><button class="fg-reveal" data-path="${escapeHtml(x.path || '')}">定位</button></td>
         </tr>`).join('');
     const body = rows ? `
+        <div class="fg-table-wrap">
         <table class="fg-table fg-poc-table">
             <thead><tr><th>文件</th><th>ID</th><th>操作</th></tr></thead>
             <tbody>${rows}</tbody>
-        </table>` : '';
+        </table></div>` : '';
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
@@ -5577,10 +5584,11 @@ function renderFingerprintPocDetailTable(title, total, items) {
         </tr>`;
     }).join('');
     const body = rows ? `
+        <div class="fg-table-wrap">
         <table class="fg-table fg-poc-detail-table">
             <thead><tr><th>文件</th><th>ID</th><th>info.name</th><th>匹配指纹</th><th>Workflow</th><th>问题</th><th>操作</th></tr></thead>
             <tbody>${rows}</tbody>
-        </table>` : '';
+        </table></div>` : '';
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
@@ -5596,10 +5604,11 @@ function renderFingerprintPocFingerTable(title, total, items) {
             <td><button class="fg-reveal" data-path="${escapeHtml(x.path || '')}">定位</button></td>
         </tr>`).join('');
     const body = rows ? `
+        <div class="fg-table-wrap">
         <table class="fg-table fg-poc-finger-table">
             <thead><tr><th>指纹</th><th>POC 文件</th><th>ID</th><th>置信</th><th>匹配依据</th><th>操作</th></tr></thead>
             <tbody>${rows}</tbody>
-        </table>` : '';
+        </table></div>` : '';
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
