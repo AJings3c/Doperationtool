@@ -716,6 +716,52 @@ export namespace main {
 	        this.reason = source["reason"];
 	    }
 	}
+	export class FingerprintPocComponentGroup {
+	    product: string;
+	    normalizedProduct: string;
+	    fingerRuleCount: number;
+	    workflowPocCount: number;
+	    pocCount: number;
+	    referencedPocCount: number;
+	    unreferencedPocCount: number;
+	    incompletePocCount: number;
+	    pocs: FingerprintPocInfo[];
+
+	    static createFrom(source: any = {}) {
+	        return new FingerprintPocComponentGroup(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.product = source["product"];
+	        this.normalizedProduct = source["normalizedProduct"];
+	        this.fingerRuleCount = source["fingerRuleCount"];
+	        this.workflowPocCount = source["workflowPocCount"];
+	        this.pocCount = source["pocCount"];
+	        this.referencedPocCount = source["referencedPocCount"];
+	        this.unreferencedPocCount = source["unreferencedPocCount"];
+	        this.incompletePocCount = source["incompletePocCount"];
+	        this.pocs = this.convertValues(source["pocs"], FingerprintPocInfo);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class FingerprintPocFingerMatch {
 	    product: string;
 	    poc: string;
@@ -755,6 +801,7 @@ export namespace main {
 	    matchReason: string;
 	    incomplete: boolean;
 	    issues: string[];
+	    contentHash?: string;
 
 	    static createFrom(source: any = {}) {
 	        return new FingerprintPocInfo(source);
@@ -776,6 +823,7 @@ export namespace main {
 	        this.matchReason = source["matchReason"];
 	        this.incomplete = source["incomplete"];
 	        this.issues = source["issues"];
+	        this.contentHash = source["contentHash"];
 	    }
 	}
 	export class FingerprintWorkflowPoc {
@@ -814,6 +862,9 @@ export namespace main {
 	    pocWithoutFingerCount: number;
 	    virtualPocCount: number;
 	    incompletePocCount: number;
+	    classifiedPocCount: number;
+	    unmatchedPocCount: number;
+	    componentCount: number;
 	    weakRuleCount: number;
 	    duplicateRuleGroupCount: number;
 	    duplicateProductGroupCount: number;
@@ -831,6 +882,7 @@ export namespace main {
 	    virtualPocs: FingerprintPocInfo[];
 	    incompletePocs: FingerprintPocInfo[];
 	    allPocs: FingerprintPocInfo[];
+	    pocGroups: FingerprintPocComponentGroup[];
 	    weakRules: FingerprintRuleIssue[];
 	    duplicateRules: FingerprintRuleDup[];
 	    duplicateProducts: FingerprintNameDup[];
@@ -867,6 +919,9 @@ export namespace main {
 	        this.pocWithoutFingerCount = source["pocWithoutFingerCount"];
 	        this.virtualPocCount = source["virtualPocCount"];
 	        this.incompletePocCount = source["incompletePocCount"];
+	        this.classifiedPocCount = source["classifiedPocCount"];
+	        this.unmatchedPocCount = source["unmatchedPocCount"];
+	        this.componentCount = source["componentCount"];
 	        this.weakRuleCount = source["weakRuleCount"];
 	        this.duplicateRuleGroupCount = source["duplicateRuleGroupCount"];
 	        this.duplicateProductGroupCount = source["duplicateProductGroupCount"];
@@ -884,6 +939,7 @@ export namespace main {
 	        this.virtualPocs = this.convertValues(source["virtualPocs"], FingerprintPocInfo);
 	        this.incompletePocs = this.convertValues(source["incompletePocs"], FingerprintPocInfo);
 	        this.allPocs = this.convertValues(source["allPocs"], FingerprintPocInfo);
+	        this.pocGroups = this.convertValues(source["pocGroups"], FingerprintPocComponentGroup);
 	        this.weakRules = this.convertValues(source["weakRules"], FingerprintRuleIssue);
 	        this.duplicateRules = this.convertValues(source["duplicateRules"], FingerprintRuleDup);
 	        this.duplicateProducts = this.convertValues(source["duplicateProducts"], FingerprintNameDup);
@@ -1139,60 +1195,40 @@ export namespace main {
 
 
 
-	export class FingerprintPocComponentGroup {
-	    product: string;
-	    normalizedProduct: string;
-	    fingerRuleCount: number;
-	    workflowPocCount: number;
-	    pocCount: number;
-	    referencedPocCount: number;
-	    unreferencedPocCount: number;
-	    incompletePocCount: number;
-	    pocs: FingerprintPocInfo[];
+	export class FingerprintPocDuplicate {
+	    key: string;
+	    reason: string;
+	    keptPath: string;
+	    keptRelPath: string;
+	    duplicatePath: string;
+	    duplicateRelPath: string;
 
 	    static createFrom(source: any = {}) {
-	        return new FingerprintPocComponentGroup(source);
+	        return new FingerprintPocDuplicate(source);
 	    }
 
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.product = source["product"];
-	        this.normalizedProduct = source["normalizedProduct"];
-	        this.fingerRuleCount = source["fingerRuleCount"];
-	        this.workflowPocCount = source["workflowPocCount"];
-	        this.pocCount = source["pocCount"];
-	        this.referencedPocCount = source["referencedPocCount"];
-	        this.unreferencedPocCount = source["unreferencedPocCount"];
-	        this.incompletePocCount = source["incompletePocCount"];
-	        this.pocs = this.convertValues(source["pocs"], FingerprintPocInfo);
+	        this.key = source["key"];
+	        this.reason = source["reason"];
+	        this.keptPath = source["keptPath"];
+	        this.keptRelPath = source["keptRelPath"];
+	        this.duplicatePath = source["duplicatePath"];
+	        this.duplicateRelPath = source["duplicateRelPath"];
 	    }
-
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 	export class FingerprintPocCatalogResult {
 	    projectRoot: string;
+	    sourceType: string;
+	    sourceDir: string;
 	    fingerPath: string;
 	    workflowPath: string;
 	    pocDir: string;
 	    fingerCount: number;
 	    workflowCount: number;
 	    pocFileCount: number;
+	    uniquePocCount: number;
+	    duplicatePocCount: number;
 	    classifiedPocCount: number;
 	    unmatchedPocCount: number;
 	    workflowPocCount: number;
@@ -1204,6 +1240,7 @@ export namespace main {
 	    unmatchedPocs: FingerprintPocInfo[];
 	    virtualPocs: FingerprintPocInfo[];
 	    incompletePocs: FingerprintPocInfo[];
+	    duplicatePocs: FingerprintPocDuplicate[];
 	    elapsed: string;
 
 	    static createFrom(source: any = {}) {
@@ -1213,12 +1250,16 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectRoot = source["projectRoot"];
+	        this.sourceType = source["sourceType"];
+	        this.sourceDir = source["sourceDir"];
 	        this.fingerPath = source["fingerPath"];
 	        this.workflowPath = source["workflowPath"];
 	        this.pocDir = source["pocDir"];
 	        this.fingerCount = source["fingerCount"];
 	        this.workflowCount = source["workflowCount"];
 	        this.pocFileCount = source["pocFileCount"];
+	        this.uniquePocCount = source["uniquePocCount"];
+	        this.duplicatePocCount = source["duplicatePocCount"];
 	        this.classifiedPocCount = source["classifiedPocCount"];
 	        this.unmatchedPocCount = source["unmatchedPocCount"];
 	        this.workflowPocCount = source["workflowPocCount"];
@@ -1230,6 +1271,7 @@ export namespace main {
 	        this.unmatchedPocs = this.convertValues(source["unmatchedPocs"], FingerprintPocInfo);
 	        this.virtualPocs = this.convertValues(source["virtualPocs"], FingerprintPocInfo);
 	        this.incompletePocs = this.convertValues(source["incompletePocs"], FingerprintPocInfo);
+	        this.duplicatePocs = this.convertValues(source["duplicatePocs"], FingerprintPocDuplicate);
 	        this.elapsed = source["elapsed"];
 	    }
 
@@ -1251,6 +1293,7 @@ export namespace main {
 		    return a;
 		}
 	}
+
 
 
 

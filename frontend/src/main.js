@@ -8,7 +8,7 @@ import {
     AutoFixNucleiTemplates,
     AuditFingerprintKnowledge,
     CancelCurrentTask,
-    ClassifyDDDDBuiltinPocs,
+    ClassifyExternalPocsByDDDD,
     ConvertMarkdownBatch,
     ConvertMarkdownFile,
     ConvertMarkdownFolder,
@@ -106,16 +106,9 @@ document.querySelector('#app').innerHTML = `
         <button class="sidebar-collapse" id="btn-sidebar-collapse" title="收起侧栏" aria-label="收起侧栏">‹</button>
     </div>
     <ul class="module-list" id="module-list">
-        <li class="module-item" data-tool="yaml-converter"><span class="module-icon">Y</span><span class="module-label">YAML 转换</span></li>
-        <li class="module-item" data-tool="dddd-fingerprint-converter"><span class="module-icon">F</span><span class="module-label">指纹转换</span></li>
-        <li class="module-item" data-tool="poc-converter"><span class="module-icon">P</span><span class="module-label">POC 转换</span></li>
-        <li class="module-item" data-tool="filename-extract"><span class="module-icon">N</span><span class="module-label">文件名提取</span></li>
-        <li class="module-item" data-tool="nuclei-validator"><span class="module-icon">V</span><span class="module-label">Nuclei 验证</span></li>
-        <li class="module-item" data-tool="template-dedup"><span class="module-icon">D</span><span class="module-label">模板去重</span></li>
-        <li class="module-item" data-tool="template-classify"><span class="module-icon">C</span><span class="module-label">模板分类</span></li>
-        <li class="module-item" data-tool="yaml-collect"><span class="module-icon">G</span><span class="module-label">YAML 采集</span></li>
         <li class="module-item" data-tool="fingerprint-governance"><span class="module-icon">A</span><span class="module-label">dddd 能力对比</span></li>
-        <li class="module-item" data-tool="poc-catalog"><span class="module-icon">K</span><span class="module-label">dddd POC归类</span></li>
+        <li class="module-item" data-tool="poc-catalog"><span class="module-icon">P</span><span class="module-label">外部 POC 归类</span></li>
+        <li class="module-item" data-tool="dddd-fingerprint-converter"><span class="module-icon">F</span><span class="module-label">外部指纹导入</span></li>
     </ul>
     <div class="sidebar-footer">© 2026 Doperationtool</div>
     <div class="sidebar-resizer" id="sidebar-resizer" title="拖动调整宽度"></div>
@@ -4703,7 +4696,7 @@ function loadFingerGovState() {
         const raw = localStorage.getItem(FINGER_GOV_KEY);
         if (raw) return JSON.parse(raw);
     } catch (e) {}
-    return { root: '', history: [], importDir: '', importHistory: [] };
+    return { root: '', history: [], importDir: '', importHistory: [], pocDir: '', pocHistory: [] };
 }
 function saveFingerGovState(s) {
     try {
@@ -4712,6 +4705,8 @@ function saveFingerGovState(s) {
             history: s.history || [],
             importDir: s.importDir || '',
             importHistory: s.importHistory || [],
+            pocDir: s.pocDir || '',
+            pocHistory: s.pocHistory || [],
         }));
     } catch (e) {}
 }
@@ -4841,7 +4836,7 @@ function renderDDDDFingerprintConverter(container) {
         <div class="fg-import-card">
             <div class="fg-import-head">
                 <div>
-                    <b>指纹转换与优化</b>
+                    <b>外部指纹导入与优化</b>
                     <span>支持 YAML / JSON / TXT 等来源，自动归一化产品名、去重、评分、提示弱规则，并可备份后写回目标项目。</span>
                 </div>
             </div>
@@ -4979,7 +4974,7 @@ function setupDDDDFingerprintConverter() {
         elRun.textContent = '⏳ 转换中…';
         elSummary.innerHTML = '';
         elResult.innerHTML = `<div class="yaml-empty">正在解析 ${escapeHtml(sourceDir)} 并转换为 finger.yaml 指纹表达式…</div>`;
-        progressTracker.start('fingerprint:import:progress', '指纹转换预览');
+        progressTracker.start('fingerprint:import:progress', '外部指纹导入预览');
         try {
             const r = await PreviewFingerprintImport(root, sourceDir);
             lastFingerprintImportPreview = r;
@@ -4987,10 +4982,10 @@ function setupDDDDFingerprintConverter() {
             if (root) pushFingerHistory('history', 'root', root);
             pushFingerHistory('importHistory', 'importDir', sourceDir);
             renderHistories();
-            toast(`✅ 转换完成: ${r.productCount || 0} 个产品 · ${r.ruleCount || 0} 条规则 (${r.elapsed || ''})`, 'success');
+            toast(`✅ 导入预览完成: ${r.productCount || 0} 个产品 · ${r.ruleCount || 0} 条规则 (${r.elapsed || ''})`, 'success');
         } catch (err) {
             const msg = String(err);
-            elResult.innerHTML = `<div class="poc-validate-fail">❌ 转换失败: ${escapeHtml(msg)}</div>`;
+            elResult.innerHTML = `<div class="poc-validate-fail">❌ 导入预览失败: ${escapeHtml(msg)}</div>`;
             toast(msg, 'error');
             progressTracker.stop();
         } finally {
@@ -5053,8 +5048,8 @@ function renderFingerprintGovernance(container) {
             <input type="text" class="yaml-path-input" id="fg-root"
                 placeholder="选择 dddd 根目录, 例如 D:\\AI\\scan\\dddd" spellcheck="false" />
             <button class="btn" id="fg-pick">选择目录</button>
-            <button class="btn" id="fg-open-converter">指纹转换</button>
-            <button class="btn" id="fg-open-poc-catalog">POC 按指纹归类</button>
+            <button class="btn" id="fg-open-converter">外部指纹导入</button>
+            <button class="btn" id="fg-open-poc-catalog">外部 POC归类</button>
             <button class="btn btn-primary" id="fg-run">▶️ 开始审计</button>
         </div>
         <div class="nv-history" id="fg-history"></div>
@@ -5068,16 +5063,22 @@ function renderPocCatalog(container) {
     container.innerHTML = `
     <div class="fingerprint-governance poc-catalog">
         <div class="extractor-tip">
-            🧩 这里加载 dddd <code>common/config/pocs</code> 下所有内置 POC，并按 <code>finger.yaml</code> 的组件指纹自动归类；同时标出未进 workflow 的虚空 POC、未匹配指纹 POC 和残缺 POC。
+            🧩 这里加载外部 POC 目录，先按 <code>id / 内容哈希 / 文件名</code> 去重，再按 dddd <code>finger.yaml</code> 的产品指纹归类，方便判断外部 POC 覆盖哪些 dddd 组件。
         </div>
         <div class="nv-toolbar">
             <input type="text" class="yaml-path-input" id="pc-root"
                 placeholder="选择 dddd 根目录, 例如 D:\\AI\\scan\\dddd" spellcheck="false" />
-            <button class="btn" id="pc-pick">选择目录</button>
+            <button class="btn" id="pc-pick">选择 dddd 根目录</button>
             <button class="btn" id="pc-open-audit">指纹/POC 能力对比</button>
-            <button class="btn btn-primary" id="pc-run">▶️ 加载并按指纹归类</button>
         </div>
         <div class="nv-history" id="pc-history"></div>
+        <div class="nv-toolbar">
+            <input type="text" class="yaml-path-input" id="pc-src"
+                placeholder="选择外部 POC 目录，支持递归扫描 yaml / yml" spellcheck="false" />
+            <button class="btn" id="pc-src-pick">选择外部 POC</button>
+            <button class="btn btn-primary" id="pc-run">▶️ 去重并按 dddd 指纹归类</button>
+        </div>
+        <div class="nv-history" id="pc-src-history"></div>
         <div class="fg-summary" id="pc-summary"></div>
         <div class="fg-result" id="pc-result"></div>
     </div>`;
@@ -5086,21 +5087,29 @@ function renderPocCatalog(container) {
 
 function setupPocCatalog() {
     const elRoot = document.getElementById('pc-root');
+    const elSrc = document.getElementById('pc-src');
     const elPick = document.getElementById('pc-pick');
+    const elSrcPick = document.getElementById('pc-src-pick');
     const elAudit = document.getElementById('pc-open-audit');
     const elRun = document.getElementById('pc-run');
     const elHist = document.getElementById('pc-history');
+    const elSrcHist = document.getElementById('pc-src-history');
     const elSummary = document.getElementById('pc-summary');
     const elResult = document.getElementById('pc-result');
 
     elRoot.value = fingerGovState.root || '';
+    elSrc.value = fingerGovState.pocDir || '';
 
     function renderHistory() {
         renderFingerHistoryChips(elHist, fingerGovState.history, (p) => {
             elRoot.value = p;
             fingerGovState.root = p;
             saveFingerGovState(fingerGovState);
-            runCatalog(p);
+        });
+        renderFingerHistoryChips(elSrcHist, fingerGovState.pocHistory, (p) => {
+            elSrc.value = p;
+            fingerGovState.pocDir = p;
+            saveFingerGovState(fingerGovState);
         });
     }
     renderHistory();
@@ -5116,14 +5125,32 @@ function setupPocCatalog() {
             toast(`选择失败: ${err}`, 'error');
         }
     });
+    elSrcPick.addEventListener('click', async () => {
+        try {
+            const f = await SelectDirectory();
+            if (!f) return;
+            elSrc.value = f;
+            pushFingerHistory('pocHistory', 'pocDir', f);
+            renderHistory();
+        } catch (err) {
+            toast(`选择失败: ${err}`, 'error');
+        }
+    });
     elRoot.addEventListener('input', () => {
         fingerGovState.root = elRoot.value.trim();
         saveFingerGovState(fingerGovState);
     });
-    elRoot.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') runCatalog(elRoot.value.trim());
+    elSrc.addEventListener('input', () => {
+        fingerGovState.pocDir = elSrc.value.trim();
+        saveFingerGovState(fingerGovState);
     });
-    elRun.addEventListener('click', () => runCatalog(elRoot.value.trim()));
+    elRoot.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') runCatalog(elRoot.value.trim(), elSrc.value.trim());
+    });
+    elSrc.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') runCatalog(elRoot.value.trim(), elSrc.value.trim());
+    });
+    elRun.addEventListener('click', () => runCatalog(elRoot.value.trim(), elSrc.value.trim()));
     elAudit.addEventListener('click', () => {
         const root = elRoot.value.trim();
         if (root) pushFingerHistory('history', 'root', root);
@@ -5135,24 +5162,30 @@ function setupPocCatalog() {
         RevealInFileManager(btn.dataset.path).catch((err) => toast(String(err), 'error'));
     });
 
-    async function runCatalog(root) {
+    async function runCatalog(root, sourceDir) {
         if (!root) {
             toast('请先选择或粘贴 dddd 根目录', 'error');
             return;
         }
+        if (!sourceDir) {
+            toast('请先选择或粘贴外部 POC 目录', 'error');
+            return;
+        }
         elRun.disabled = true;
         elPick.disabled = true;
+        elSrcPick.disabled = true;
         const oldLabel = elRun.textContent;
         elRun.textContent = '⏳ 归类中…';
         elSummary.innerHTML = '';
-        elResult.innerHTML = `<div class="yaml-empty">正在扫描 ${escapeHtml(root)} 的内置 POC 并按组件指纹归类…</div>`;
-        progressTracker.start('fingerprint:poc_catalog:progress', '内置 POC 归类');
+        elResult.innerHTML = `<div class="yaml-empty">正在扫描 ${escapeHtml(sourceDir)}，并按 ${escapeHtml(root)} 的产品指纹归类…</div>`;
+        progressTracker.start('fingerprint:external_poc_catalog:progress', '外部 POC 归类');
         try {
-            const r = await ClassifyDDDDBuiltinPocs(root);
+            const r = await ClassifyExternalPocsByDDDD(root, sourceDir);
             renderPocCatalogResult(r, elSummary, elResult);
             pushFingerHistory('history', 'root', root);
+            pushFingerHistory('pocHistory', 'pocDir', sourceDir);
             renderHistory();
-            const score = (r.virtualPocCount || 0) + (r.unmatchedPocCount || 0) + (r.incompletePocCount || 0);
+            const score = (r.duplicatePocCount || 0) + (r.unmatchedPocCount || 0) + (r.incompletePocCount || 0);
             toast(score > 0 ? `⚠️ 归类完成: 发现 ${score} 个重点问题 (${r.elapsed})` : `✅ 归类完成 (${r.elapsed})`, score > 0 ? 'error' : 'success');
         } catch (err) {
             const msg = String(err);
@@ -5162,6 +5195,7 @@ function setupPocCatalog() {
         } finally {
             elRun.disabled = false;
             elPick.disabled = false;
+            elSrcPick.disabled = false;
             elRun.textContent = oldLabel;
         }
     }
@@ -5292,26 +5326,29 @@ function renderFingerprintAudit(r, elSummary, elResult) {
             <div><b>pocs:</b> <code>${escapeHtml(r.pocDir || '')}</code></div>
         </div>`;
 
-    elResult.innerHTML = `<div class="fg-result-grid">` + [
-        renderFingerprintTable('缺失 POC', r.missingPocCount, r.missingPocs, ['产品', 'POC'], (x) => [x.product, x.poc]),
-        renderFingerprintPocDetailTable('虚空 POC：在 config/pocs 但 workflow 不可调用', r.virtualPocCount || r.orphanPocCount, r.virtualPocs || r.orphanPocs),
-        renderFingerprintPocFingerTable('POC 有指纹且可调用', r.pocWithFingerWorkflowCount, r.pocWithFingerWorkflow),
-        renderFingerprintPocFingerTable('POC 有指纹全集', r.pocWithFingerCount, r.pocWithFinger),
-        renderFingerprintList('有指纹但无可用 POC', r.fingerWithoutPocCount, r.fingerWithoutPoc),
-        renderFingerprintPocFingerTable('POC 有指纹但未加载 Workflow', r.pocWithFingerNoWorkflowCount, r.pocWithFingerNoWorkflow),
-        renderFingerprintPocDetailTable('POC 无对应指纹', r.pocWithoutFingerCount, r.pocWithoutFinger),
-        renderFingerprintPocDetailTable('残缺不完整 POC', r.incompletePocCount, r.incompletePocs),
-        renderFingerprintList('有指纹但无 workflow', r.fingerWithoutWorkflowCount, r.fingerWithoutWorkflow),
-        renderFingerprintList('有 workflow 但无指纹', r.workflowWithoutFingerCount, r.workflowWithoutFinger),
-        renderFingerprintTable('弱规则候选', r.weakRuleCount, r.weakRules, ['产品', '原因', '规则'], (x) => [x.product, x.reason, x.rule]),
-        renderFingerprintTable('重复规则组', r.duplicateRuleGroupCount, r.duplicateRules, ['规则', '产品'], (x) => [x.rule, (x.products || []).join(', ')]),
-        renderFingerprintTable('疑似重复产品名', r.duplicateProductGroupCount, r.duplicateProducts, ['归一化名称', '产品'], (x) => [x.name, (x.products || []).join(', ')]),
-        renderFingerprintTable('Workflow 自动建议', r.workflowSuggestionCount, r.workflowSuggestions, ['产品', '候选 POC', '置信度', '原因'], (x) => [x.product, x.pocRelPath || x.poc, x.confidence, x.reason]),
-        renderFingerprintList('资产识别类产品', r.assetOnlyProductCount, r.assetOnlyProducts),
-        renderFingerprintPocDetailTable('全部内置 POC', (r.allPocs || []).length, r.allPocs),
-        renderFingerprintTable('POC 覆盖 Top 50', (r.topWorkflowProducts || []).length, r.topWorkflowProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs]),
-        renderFingerprintTable('指纹规则 Top 50', (r.topFingerProducts || []).length, r.topFingerProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs]),
-    ].join('') + `</div>`;
+    elResult.innerHTML = [
+        renderPocCatalogGroups(r.pocGroups || [], 'builtin'),
+        `<div class="fg-result-grid">` + [
+            renderFingerprintTable('缺失 POC', r.missingPocCount, r.missingPocs, ['产品', 'POC'], (x) => [x.product, x.poc]),
+            renderFingerprintPocDetailTable('虚空 POC：在 config/pocs 但 workflow 不可调用', r.virtualPocCount || r.orphanPocCount, r.virtualPocs || r.orphanPocs),
+            renderFingerprintPocFingerTable('POC 有指纹且可调用', r.pocWithFingerWorkflowCount, r.pocWithFingerWorkflow),
+            renderFingerprintPocFingerTable('POC 有指纹全集', r.pocWithFingerCount, r.pocWithFinger),
+            renderFingerprintList('有指纹但无可用 POC', r.fingerWithoutPocCount, r.fingerWithoutPoc),
+            renderFingerprintPocFingerTable('POC 有指纹但未加载 Workflow', r.pocWithFingerNoWorkflowCount, r.pocWithFingerNoWorkflow),
+            renderFingerprintPocDetailTable('POC 无对应指纹', r.pocWithoutFingerCount, r.pocWithoutFinger),
+            renderFingerprintPocDetailTable('残缺不完整 POC', r.incompletePocCount, r.incompletePocs),
+            renderFingerprintList('有指纹但无 workflow', r.fingerWithoutWorkflowCount, r.fingerWithoutWorkflow),
+            renderFingerprintList('有 workflow 但无指纹', r.workflowWithoutFingerCount, r.workflowWithoutFinger),
+            renderFingerprintTable('弱规则候选', r.weakRuleCount, r.weakRules, ['产品', '原因', '规则'], (x) => [x.product, x.reason, x.rule]),
+            renderFingerprintTable('重复规则组', r.duplicateRuleGroupCount, r.duplicateRules, ['规则', '产品'], (x) => [x.rule, (x.products || []).join(', ')]),
+            renderFingerprintTable('疑似重复产品名', r.duplicateProductGroupCount, r.duplicateProducts, ['归一化名称', '产品'], (x) => [x.name, (x.products || []).join(', ')]),
+            renderFingerprintTable('Workflow 自动建议', r.workflowSuggestionCount, r.workflowSuggestions, ['产品', '候选 POC', '置信度', '原因'], (x) => [x.product, x.pocRelPath || x.poc, x.confidence, x.reason]),
+            renderFingerprintList('资产识别类产品', r.assetOnlyProductCount, r.assetOnlyProducts),
+            renderFingerprintPocDetailTable('全部内置 POC', (r.allPocs || []).length, r.allPocs),
+            renderFingerprintTable('POC 覆盖 Top 50', (r.topWorkflowProducts || []).length, r.topWorkflowProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs]),
+            renderFingerprintTable('指纹规则 Top 50', (r.topFingerProducts || []).length, r.topFingerProducts, ['产品', '指纹规则', 'POC'], (x) => [x.product, x.fingerRules, x.pocs]),
+        ].join('') + `</div>`,
+    ].join('');
 }
 
 function renderPocCatalogResult(r, elSummary, elResult) {
@@ -5323,30 +5360,45 @@ function renderPocCatalogResult(r, elSummary, elResult) {
     elSummary.innerHTML = `
         <div class="fg-stat-grid">
             ${stat('指纹产品', r.fingerCount || 0)}
-            ${stat('Workflow 产品', r.workflowCount || 0)}
-            ${stat('Workflow POC 引用', r.workflowPocCount || 0)}
-            ${stat('内置 POC 文件', r.pocFileCount || 0)}
+            ${stat('扫描 POC 文件', r.pocFileCount || 0)}
+            ${stat('去重后 POC', r.uniquePocCount || r.pocFileCount || 0, 'fg-good')}
+            ${stat('重复 POC', r.duplicatePocCount || 0, (r.duplicatePocCount || 0) ? 'fg-warn' : 'fg-good')}
             ${stat('已按指纹归类', r.classifiedPocCount || 0, (r.classifiedPocCount || 0) ? 'fg-good' : '')}
             ${stat('组件分组', r.componentCount || 0)}
             ${stat('未匹配指纹 POC', r.unmatchedPocCount || 0, (r.unmatchedPocCount || 0) ? 'fg-bad' : 'fg-good')}
-            ${stat('虚空 POC', r.virtualPocCount || 0, (r.virtualPocCount || 0) ? 'fg-warn' : 'fg-good')}
             ${stat('残缺 POC', r.incompletePocCount || 0, (r.incompletePocCount || 0) ? 'fg-bad' : 'fg-good')}
         </div>
         <div class="fg-paths">
             <div><b>dddd:</b> <code>${escapeHtml(r.projectRoot || '')}</code></div>
             <div><b>finger:</b> <code>${escapeHtml(r.fingerPath || '')}</code></div>
-            <div><b>workflow:</b> <code>${escapeHtml(r.workflowPath || '')}</code></div>
-            <div><b>pocs:</b> <code>${escapeHtml(r.pocDir || '')}</code></div>
+            <div><b>source:</b> <code>${escapeHtml(r.sourceDir || r.pocDir || '')}</code></div>
         </div>`;
     elResult.innerHTML = [
-        renderPocCatalogGroups(r.groups || []),
+        renderPocCatalogGroups(r.groups || [], r.sourceType || 'external'),
         `<div class="fg-result-grid">
-            ${renderFingerprintPocDetailTable('全部内置 POC', r.pocFileCount, r.allPocs)}
-            ${renderFingerprintPocDetailTable('虚空 POC：在 config/pocs 但 workflow 不可调用', r.virtualPocCount, r.virtualPocs)}
-            ${renderFingerprintPocDetailTable('有 POC 但无指纹', r.unmatchedPocCount, r.unmatchedPocs)}
-            ${renderFingerprintPocDetailTable('残缺不完整 POC', r.incompletePocCount, r.incompletePocs)}
+            ${renderFingerprintPocDetailTable('去重后外部 POC', r.uniquePocCount || (r.allPocs || []).length, r.allPocs)}
+            ${renderPocDuplicateTable('重复 POC', r.duplicatePocCount, r.duplicatePocs)}
+            ${renderFingerprintPocDetailTable('未匹配 dddd 指纹的外部 POC', r.unmatchedPocCount, r.unmatchedPocs)}
+            ${renderFingerprintPocDetailTable('残缺不完整外部 POC', r.incompletePocCount, r.incompletePocs)}
         </div>`,
     ].join('');
+}
+
+function renderPocDuplicateTable(title, total, items) {
+    const list = items || [];
+    const rows = list.map((x) => `
+        <tr>
+            <td title="${escapeHtml(x.reason || '')}">${escapeHtml(x.reason || '')}</td>
+            <td title="${escapeHtml(x.keptRelPath || x.keptPath || '')}">${escapeHtml(x.keptRelPath || x.keptPath || '')}</td>
+            <td title="${escapeHtml(x.duplicateRelPath || x.duplicatePath || '')}">${escapeHtml(x.duplicateRelPath || x.duplicatePath || '')}</td>
+            <td title="${escapeHtml(x.key || '')}">${escapeHtml(x.key || '')}</td>
+        </tr>`).join('');
+    const body = rows ? `
+        <table class="fg-table">
+            <thead><tr><th>原因</th><th>保留</th><th>重复</th><th>去重键</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>` : '';
+    return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
 function renderFingerprintImportPreview(r, elSummary, elResult) {
@@ -5524,15 +5576,19 @@ function renderFingerprintPocFingerTable(title, total, items) {
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
-function renderPocCatalogGroups(groups) {
+function renderPocCatalogGroups(groups, sourceType = 'builtin') {
     const list = groups || [];
+    const isExternal = sourceType === 'external';
     const cards = list.map((g, i) => {
         const pocs = (g.pocs || []).slice(0, 80).map((p) => {
-            const flags = [
+            const flags = (isExternal ? [
+                p.incomplete ? '残缺' : '',
+                p.matchConfidence ? `${p.matchConfidence}` : '',
+            ] : [
                 p.referencedByWorkflow ? 'workflow' : '虚空',
                 p.incomplete ? '残缺' : '',
                 p.matchConfidence ? `${p.matchConfidence}` : '',
-            ].filter(Boolean).join(' · ');
+            ]).filter(Boolean).join(' · ');
             return `
                 <div class="fg-poc-mini-row">
                     <button class="fg-reveal" data-path="${escapeHtml(p.path || '')}">定位</button>
@@ -5540,7 +5596,10 @@ function renderPocCatalogGroups(groups) {
                     <em>${escapeHtml(flags)}</em>
                 </div>`;
         }).join('');
-        const more = (g.pocs || []).length > 80 ? `<div class="fg-empty">还有 ${(g.pocs || []).length - 80} 个 POC 未展示，可看“全部内置 POC”。</div>` : '';
+        const more = (g.pocs || []).length > 80 ? `<div class="fg-empty">还有 ${(g.pocs || []).length - 80} 个 POC 未展示，可看详情列表。</div>` : '';
+        const meta = isExternal
+            ? `指纹规则 ${escapeHtml(g.fingerRuleCount || 0)} · 外部 POC ${escapeHtml(g.pocCount || 0)} · 残缺 ${escapeHtml(g.incompletePocCount || 0)}`
+            : `指纹规则 ${escapeHtml(g.fingerRuleCount || 0)} · workflow 引用 ${escapeHtml(g.workflowPocCount || 0)} · 可调用 ${escapeHtml(g.referencedPocCount || 0)} · 虚空 ${escapeHtml(g.unreferencedPocCount || 0)} · 残缺 ${escapeHtml(g.incompletePocCount || 0)}`;
         return `
         <section class="fg-class-card" id="pc-group-${i}">
             <div class="fg-class-card-head">
@@ -5548,7 +5607,7 @@ function renderPocCatalogGroups(groups) {
                 <span>${escapeHtml(g.pocCount || 0)} 个 POC</span>
             </div>
             <div class="fg-poc-group-meta">
-                指纹规则 ${escapeHtml(g.fingerRuleCount || 0)} · workflow 引用 ${escapeHtml(g.workflowPocCount || 0)} · 可调用 ${escapeHtml(g.referencedPocCount || 0)} · 虚空 ${escapeHtml(g.unreferencedPocCount || 0)} · 残缺 ${escapeHtml(g.incompletePocCount || 0)}
+                ${meta}
             </div>
             <div class="fg-poc-mini-list">${pocs || '<div class="fg-empty">暂无 POC</div>'}${more}</div>
         </section>`;
@@ -5570,29 +5629,15 @@ function renderFingerprintList(title, total, items) {
 // ============================================================
 
 const routes = {
-    'filename-extract':  { module: '辅助模块', name: '文件名提取',   render: renderFilenameExtract },
-    'nuclei-validator':  { module: '辅助模块', name: 'Nuclei 验证',  render: renderNucleiValidator },
-    'template-dedup':    { module: '辅助模块', name: '模板去重',     render: renderTemplateDedup   },
-    'template-classify': { module: '辅助模块', name: '模板分类',     render: renderTemplateClassify },
-    'yaml-collect':      { module: '辅助模块', name: 'YAML 采集',    render: renderYamlCollect     },
     'fingerprint-governance': { module: '辅助模块', name: 'dddd 能力对比', render: renderFingerprintGovernance },
-    'poc-catalog':       { module: '辅助模块', name: 'dddd POC归类', render: renderPocCatalog      },
-    'yaml-converter':    { module: '转换模块', name: 'YAML 转换',    render: renderYamlConverter   },
-    'dddd-fingerprint-converter': { module: '转换模块', name: '指纹转换', render: renderDDDDFingerprintConverter },
-    'poc-converter':     { module: '转换模块', name: 'POC 转换', render: renderPocConverter    },
+    'poc-catalog':       { module: '辅助模块', name: '外部 POC 归类', render: renderPocCatalog      },
+    'dddd-fingerprint-converter': { module: '转换模块', name: '外部指纹导入', render: renderDDDDFingerprintConverter },
 };
 
 const moduleByTool = {
-    'filename-extract':  'aux',
-    'nuclei-validator':  'aux',
-    'template-dedup':    'aux',
-    'template-classify': 'aux',
-    'yaml-collect':      'aux',
     'fingerprint-governance': 'aux',
     'poc-catalog':       'aux',
-    'yaml-converter':    'convert',
     'dddd-fingerprint-converter': 'convert',
-    'poc-converter':     'convert',
 };
 
 // 持久化当前路由 key, 跨次启动 / wails dev 热重载后能回到上次的页面.
@@ -5656,11 +5701,11 @@ document.addEventListener('click', (e) => {
 window.addEventListener('error', (e) => console.error('[window-error]', e.error || e.message));
 window.addEventListener('unhandledrejection', (e) => console.error('[unhandled-rejection]', e.reason));
 
-// 启动: 优先恢复上次访问的页面, 否则默认进 YAML 转换.
+// 启动: 优先恢复上次访问的页面, 否则默认进 dddd 能力对比.
 // 用 routes 校验避免老 localStorage 残留指向已删的工具.
 {
     const last = loadRoute();
-    const target = last && routes[last] ? last : 'yaml-converter';
+    const target = last && routes[last] ? last : 'fingerprint-governance';
     console.log('[boot] last route =', last, '→ navigating to', target);
     navigate(target);
 }

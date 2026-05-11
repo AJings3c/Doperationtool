@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,6 +36,9 @@ type FingerprintAuditResult struct {
 	PocWithoutFingerCount        int                             `json:"pocWithoutFingerCount"`
 	VirtualPocCount              int                             `json:"virtualPocCount"`
 	IncompletePocCount           int                             `json:"incompletePocCount"`
+	ClassifiedPocCount           int                             `json:"classifiedPocCount"`
+	UnmatchedPocCount            int                             `json:"unmatchedPocCount"`
+	ComponentCount               int                             `json:"componentCount"`
 	WeakRuleCount                int                             `json:"weakRuleCount"`
 	DuplicateRuleGroupCount      int                             `json:"duplicateRuleGroupCount"`
 	DuplicateProductGroupCount   int                             `json:"duplicateProductGroupCount"`
@@ -52,6 +56,7 @@ type FingerprintAuditResult struct {
 	VirtualPocs                  []FingerprintPocInfo            `json:"virtualPocs"`
 	IncompletePocs               []FingerprintPocInfo            `json:"incompletePocs"`
 	AllPocs                      []FingerprintPocInfo            `json:"allPocs"`
+	PocGroups                    []FingerprintPocComponentGroup  `json:"pocGroups"`
 	WeakRules                    []FingerprintRuleIssue          `json:"weakRules"`
 	DuplicateRules               []FingerprintRuleDup            `json:"duplicateRules"`
 	DuplicateProducts            []FingerprintNameDup            `json:"duplicateProducts"`
@@ -82,6 +87,7 @@ type FingerprintPocInfo struct {
 	MatchReason          string   `json:"matchReason"`
 	Incomplete           bool     `json:"incomplete"`
 	Issues               []string `json:"issues"`
+	ContentHash          string   `json:"contentHash,omitempty"`
 }
 
 type FingerprintPocFingerMatch struct {
@@ -127,12 +133,16 @@ type FingerprintWorkflowSuggestion struct {
 
 type FingerprintPocCatalogResult struct {
 	ProjectRoot        string                         `json:"projectRoot"`
+	SourceType         string                         `json:"sourceType"`
+	SourceDir          string                         `json:"sourceDir"`
 	FingerPath         string                         `json:"fingerPath"`
 	WorkflowPath       string                         `json:"workflowPath"`
 	PocDir             string                         `json:"pocDir"`
 	FingerCount        int                            `json:"fingerCount"`
 	WorkflowCount      int                            `json:"workflowCount"`
 	PocFileCount       int                            `json:"pocFileCount"`
+	UniquePocCount     int                            `json:"uniquePocCount"`
+	DuplicatePocCount  int                            `json:"duplicatePocCount"`
 	ClassifiedPocCount int                            `json:"classifiedPocCount"`
 	UnmatchedPocCount  int                            `json:"unmatchedPocCount"`
 	WorkflowPocCount   int                            `json:"workflowPocCount"`
@@ -144,7 +154,17 @@ type FingerprintPocCatalogResult struct {
 	UnmatchedPocs      []FingerprintPocInfo           `json:"unmatchedPocs"`
 	VirtualPocs        []FingerprintPocInfo           `json:"virtualPocs"`
 	IncompletePocs     []FingerprintPocInfo           `json:"incompletePocs"`
+	DuplicatePocs      []FingerprintPocDuplicate      `json:"duplicatePocs"`
 	Elapsed            string                         `json:"elapsed"`
+}
+
+type FingerprintPocDuplicate struct {
+	Key              string `json:"key"`
+	Reason           string `json:"reason"`
+	KeptPath         string `json:"keptPath"`
+	KeptRelPath      string `json:"keptRelPath"`
+	DuplicatePath    string `json:"duplicatePath"`
+	DuplicateRelPath string `json:"duplicateRelPath"`
 }
 
 type FingerprintPocComponentGroup struct {
@@ -431,11 +451,14 @@ func scanFingerprintPocs(ctx context.Context, pe *progressEmitter, dir string) (
 			rel = name
 		}
 		meta := fingerprintPocTemplateMeta{}
+		contentHash := ""
 		if raw, readErr := os.ReadFile(path); readErr == nil {
+			sum := sha1.Sum(raw)
+			contentHash = fmt.Sprintf("%x", sum[:])
 			meta = parseFingerprintPocTemplateMeta(raw)
 		}
 		issues := fingerprintPocIncompleteIssues(meta)
-		pocs = append(pocs, FingerprintPocInfo{Path: path, RelPath: rel, Name: name, ID: meta.ID, InfoName: meta.InfoName, Severity: meta.Severity, Tags: meta.Tags, Incomplete: len(issues) > 0, Issues: issues})
+		pocs = append(pocs, FingerprintPocInfo{Path: path, RelPath: rel, Name: name, ID: meta.ID, InfoName: meta.InfoName, Severity: meta.Severity, Tags: meta.Tags, Incomplete: len(issues) > 0, Issues: issues, ContentHash: contentHash})
 		pe.tick(len(pocs), fmt.Sprintf("已扫描 %d 个 POC", len(pocs)))
 		return nil
 	})
@@ -765,6 +788,12 @@ func buildFingerprintAudit(root, fingerPath, workflowPath, pocDir string, finger
 	sortFingerprintPocInfos(res.IncompletePocs)
 	sortFingerprintPocMatches(res.PocWithFinger)
 	sortFingerprintPocMatches(res.PocWithFingerWorkflow)
+	if catalog := buildFingerprintPocCatalog(root, fingerPath, workflowPath, pocDir, fingers, workflows, pocs); catalog != nil {
+		res.PocGroups = catalog.Groups
+		res.ClassifiedPocCount = catalog.ClassifiedPocCount
+		res.UnmatchedPocCount = catalog.UnmatchedPocCount
+		res.ComponentCount = catalog.ComponentCount
+	}
 	sort.Slice(res.PocWithFingerNoWorkflow, func(i, j int) bool {
 		if res.PocWithFingerNoWorkflow[i].Product == res.PocWithFingerNoWorkflow[j].Product {
 			return res.PocWithFingerNoWorkflow[i].PocRelPath < res.PocWithFingerNoWorkflow[j].PocRelPath

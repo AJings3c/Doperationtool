@@ -30,6 +30,10 @@ export function ClassifyDDDDBuiltinPocs(arg1) {
   return window['go']['main']['App']['ClassifyDDDDBuiltinPocs'](arg1);
 }
 
+export function ClassifyExternalPocsByDDDD(arg1, arg2) {
+  return window['go']['main']['App']['ClassifyExternalPocsByDDDD'](arg1, arg2);
+}
+
 export function ConvertMarkdownBatch(arg1) {
   return window['go']['main']['App']['ConvertMarkdownBatch'](arg1);
 }
