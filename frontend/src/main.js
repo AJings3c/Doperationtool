@@ -5048,8 +5048,6 @@ function renderFingerprintGovernance(container) {
             <input type="text" class="yaml-path-input" id="fg-root"
                 placeholder="选择 dddd 根目录, 例如 D:\\AI\\scan\\dddd" spellcheck="false" />
             <button class="btn" id="fg-pick">选择目录</button>
-            <button class="btn" id="fg-open-converter">外部指纹导入</button>
-            <button class="btn" id="fg-open-poc-catalog">外部 POC归类</button>
             <button class="btn btn-primary" id="fg-run">▶️ 开始审计</button>
         </div>
         <div class="nv-history" id="fg-history"></div>
@@ -5204,8 +5202,6 @@ function setupPocCatalog() {
 function setupFingerprintGovernance() {
     const elRoot = document.getElementById('fg-root');
     const elPick = document.getElementById('fg-pick');
-    const elConverter = document.getElementById('fg-open-converter');
-    const elPocCatalog = document.getElementById('fg-open-poc-catalog');
     const elRun = document.getElementById('fg-run');
     const elHist = document.getElementById('fg-history');
     const elSummary = document.getElementById('fg-summary');
@@ -5242,16 +5238,6 @@ function setupFingerprintGovernance() {
         if (e.key === 'Enter') runAudit(elRoot.value.trim());
     });
     elRun.addEventListener('click', () => runAudit(elRoot.value.trim()));
-    elConverter.addEventListener('click', () => {
-        const root = elRoot.value.trim();
-        if (root) pushFingerHistory('history', 'root', root);
-        navigate('dddd-fingerprint-converter');
-    });
-    elPocCatalog.addEventListener('click', () => {
-        const root = elRoot.value.trim();
-        if (root) pushFingerHistory('history', 'root', root);
-        navigate('poc-catalog');
-    });
     elResult.addEventListener('click', (e) => {
         const btn = e.target.closest && e.target.closest('.fg-reveal');
         if (!btn || !elResult.contains(btn)) return;
