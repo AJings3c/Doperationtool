@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -193,6 +196,8 @@ type workflowEntry struct {
 const fingerprintAuditListLimit = 200
 
 var reFingerClause = regexp.MustCompile(`(?i)(body|title|header|banner|cert)\s*(?:=|~=)\s*"([^"]*)"`)
+var auditTokenSplitRE = regexp.MustCompile(`[^a-z0-9]+`)
+var auditWhitespaceRE = regexp.MustCompile(`\s+`)
 
 type fingerprintPocTemplateMeta struct {
 	ID           string
@@ -1014,35 +1019,127 @@ func buildFingerprintPocCatalogWithEnriched(root, fingerPath, workflowPath, pocD
 	return res, nil
 }
 
+type fingerprintMatchCandidate struct {
+	Product string
+	Norm    string
+	Tokens  []string
+}
+
+type fingerprintPocMatchCandidate struct {
+	Norm     string
+	RuneLen  int
+	TokenSet map[string]struct{}
+}
+
 func enrichFingerprintPocs(pocs []FingerprintPocInfo, fingers []fingerEntry, referenced map[string]map[string]struct{}, pe *progressEmitter, label string) ([]FingerprintPocInfo, error) {
-	out := make([]FingerprintPocInfo, 0, len(pocs))
-	for i, p := range pocs {
-		if progressCancelled(pe) {
-			return nil, fmt.Errorf("已取消")
-		}
-		cp := p
-		productSet := map[string]struct{}{}
-		for _, key := range pocAuditKeys(p) {
-			for product := range referenced[key] {
-				productSet[product] = struct{}{}
+	total := len(pocs)
+	out := make([]FingerprintPocInfo, total)
+	if total == 0 {
+		return out, nil
+	}
+	workers := fingerprintAuditParallelism(total)
+	candidates := fingerprintMatchCandidates(fingers)
+	if pe != nil {
+		pe.forceEmit(0, fmt.Sprintf("%s 0/%d，并发 %d", label, total, workers))
+	}
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	results := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				if progressCancelled(pe) {
+					return
+				}
+				idx := int(next.Add(1) - 1)
+				if idx >= total {
+					return
+				}
+				cp, err := enrichFingerprintPoc(pocs[idx], candidates, referenced, pe)
+				if err != nil {
+					results <- err
+					return
+				}
+				out[idx] = cp
+				results <- nil
 			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	completed := 0
+	var firstErr error
+	for err := range results {
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
 		}
-		cp.WorkflowProducts = sortedKeys(productSet)
-		cp.ReferencedByWorkflow = len(cp.WorkflowProducts) > 0
-		if match, ok, err := bestFingerMatchForPoc(cp, fingers, pe); err != nil {
-			return nil, err
-		} else if ok {
-			cp.MatchedProduct = match.Product
-			cp.MatchConfidence = match.Confidence
-			cp.MatchReason = match.Reason
-		}
-		out = append(out, cp)
+		completed++
 		if pe != nil {
-			pe.tick(i+1, fmt.Sprintf("%s %d/%d", label, i+1, len(pocs)))
+			pe.tick(completed, fmt.Sprintf("%s %d/%d，并发 %d", label, completed, total, workers))
 		}
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	if progressCancelled(pe) {
+		return nil, fmt.Errorf("已取消")
 	}
 	sortFingerprintPocInfos(out)
 	return out, nil
+}
+
+func fingerprintAuditParallelism(total int) int {
+	workers := runtime.NumCPU()
+	if workers < 1 {
+		workers = 1
+	}
+	runtime.GOMAXPROCS(workers)
+	if total > 0 && workers > total {
+		return total
+	}
+	return workers
+}
+
+func fingerprintMatchCandidates(fingers []fingerEntry) []fingerprintMatchCandidate {
+	out := make([]fingerprintMatchCandidate, 0, len(fingers))
+	for _, f := range fingers {
+		norm := normalizeFingerAuditName(f.Product)
+		if norm == "" {
+			continue
+		}
+		out = append(out, fingerprintMatchCandidate{Product: f.Product, Norm: norm, Tokens: splitAuditTokens(norm)})
+	}
+	return out
+}
+
+func enrichFingerprintPoc(p FingerprintPocInfo, fingers []fingerprintMatchCandidate, referenced map[string]map[string]struct{}, pe *progressEmitter) (FingerprintPocInfo, error) {
+	if progressCancelled(pe) {
+		return FingerprintPocInfo{}, fmt.Errorf("已取消")
+	}
+	cp := p
+	productSet := map[string]struct{}{}
+	for _, key := range pocAuditKeys(p) {
+		for product := range referenced[key] {
+			productSet[product] = struct{}{}
+		}
+	}
+	cp.WorkflowProducts = sortedKeys(productSet)
+	cp.ReferencedByWorkflow = len(cp.WorkflowProducts) > 0
+	if match, ok, err := bestFingerMatchForPoc(cp, fingers, pe); err != nil {
+		return FingerprintPocInfo{}, err
+	} else if ok {
+		cp.MatchedProduct = match.Product
+		cp.MatchConfidence = match.Confidence
+		cp.MatchReason = match.Reason
+	}
+	return cp, nil
 }
 
 func pocAuditKeys(p FingerprintPocInfo) []string {
@@ -1128,14 +1225,15 @@ func bestWorkflowSuggestionForProduct(product string, pocs []FingerprintPocInfo,
 	return best, true, nil
 }
 
-func bestFingerMatchForPoc(poc FingerprintPocInfo, fingers []fingerEntry, pe *progressEmitter) (FingerprintPocFingerMatch, bool, error) {
+func bestFingerMatchForPoc(poc FingerprintPocInfo, fingers []fingerprintMatchCandidate, pe *progressEmitter) (FingerprintPocFingerMatch, bool, error) {
 	best := FingerprintPocFingerMatch{}
 	bestScore := 0
-	for _, f := range fingers {
-		if progressCancelled(pe) {
+	candidates := fingerprintPocMatchCandidates(poc)
+	for i, f := range fingers {
+		if i%64 == 0 && progressCancelled(pe) {
 			return FingerprintPocFingerMatch{}, false, fmt.Errorf("已取消")
 		}
-		score, reason := workflowSuggestionScore(normalizeFingerAuditName(f.Product), poc)
+		score, reason := workflowSuggestionScoreCandidates(f, candidates)
 		if score > bestScore {
 			bestScore = score
 			pocName := strings.TrimSuffix(poc.Name, filepath.Ext(poc.Name))
@@ -1152,6 +1250,10 @@ func bestFingerMatchForPoc(poc FingerprintPocInfo, fingers []fingerEntry, pe *pr
 }
 
 func workflowSuggestionScore(productNorm string, poc FingerprintPocInfo) (int, string) {
+	return workflowSuggestionScoreCandidates(fingerprintMatchCandidate{Norm: productNorm, Tokens: splitAuditTokens(productNorm)}, fingerprintPocMatchCandidates(poc))
+}
+
+func fingerprintPocMatchCandidates(poc FingerprintPocInfo) []fingerprintPocMatchCandidate {
 	candidates := []string{
 		normalizeFingerAuditName(strings.TrimSuffix(poc.Name, filepath.Ext(poc.Name))),
 		normalizeFingerAuditName(poc.ID),
@@ -1161,25 +1263,45 @@ func workflowSuggestionScore(productNorm string, poc FingerprintPocInfo) (int, s
 	for _, tag := range poc.Tags {
 		candidates = append(candidates, normalizeFingerAuditName(tag))
 	}
-	best := 0
-	reason := ""
+	out := make([]fingerprintPocMatchCandidate, 0, len(candidates))
+	seen := map[string]struct{}{}
 	for _, cand := range candidates {
 		if cand == "" {
 			continue
 		}
+		if _, ok := seen[cand]; ok {
+			continue
+		}
+		seen[cand] = struct{}{}
+		out = append(out, fingerprintPocMatchCandidate{
+			Norm:     cand,
+			RuneLen:  len([]rune(cand)),
+			TokenSet: auditTokenSet(cand),
+		})
+	}
+	return out
+}
+
+func workflowSuggestionScoreCandidates(product fingerprintMatchCandidate, candidates []fingerprintPocMatchCandidate) (int, string) {
+	if product.Norm == "" {
+		return 0, ""
+	}
+	best := 0
+	reason := ""
+	for _, cand := range candidates {
 		score := 0
 		switch {
-		case cand == productNorm:
+		case cand.Norm == product.Norm:
 			score = 95
 			reason = "POC 名称/ID 与产品归一化名称完全匹配"
-		case strings.Contains(cand, productNorm):
+		case strings.Contains(cand.Norm, product.Norm):
 			score = 82
 			reason = "POC 名称/路径包含产品归一化名称"
-		case strings.Contains(productNorm, cand) && len([]rune(cand)) >= 4:
+		case strings.Contains(product.Norm, cand.Norm) && cand.RuneLen >= 4:
 			score = 72
 			reason = "产品名包含 POC 归一化名称"
 		default:
-			score = tokenOverlapScore(productNorm, cand)
+			score = tokenOverlapScorePrepared(product.Tokens, cand.TokenSet)
 			if score > 0 {
 				reason = "产品名与 POC 名称存在关键词重合"
 			}
@@ -1214,7 +1336,7 @@ func tokenOverlapScore(a, b string) int {
 }
 
 func splitAuditTokens(s string) []string {
-	parts := regexp.MustCompile(`[^a-z0-9]+`).Split(strings.ToLower(s), -1)
+	parts := auditTokenSplitRE.Split(strings.ToLower(s), -1)
 	out := []string{}
 	for _, part := range parts {
 		if len(part) >= 3 {
@@ -1222,6 +1344,31 @@ func splitAuditTokens(s string) []string {
 		}
 	}
 	return out
+}
+
+func auditTokenSet(s string) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, tok := range splitAuditTokens(s) {
+		out[tok] = struct{}{}
+	}
+	return out
+}
+
+func tokenOverlapScorePrepared(tokensA []string, tokensB map[string]struct{}) int {
+	matches := 0
+	for _, tok := range tokensA {
+		if _, ok := tokensB[tok]; ok {
+			matches++
+		}
+	}
+	if matches == 0 {
+		return 0
+	}
+	score := 45 + matches*10
+	if score > 68 {
+		score = 68
+	}
+	return score
 }
 
 func weakFingerprintRuleReason(rule string) string {
@@ -1245,7 +1392,7 @@ func weakFingerprintRuleReason(rule string) string {
 func normalizeFingerAuditName(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	s = strings.ReplaceAll(s, "_", "-")
-	s = regexp.MustCompile(`\s+`).ReplaceAllString(s, " ")
+	s = auditWhitespaceRE.ReplaceAllString(s, " ")
 	s = strings.TrimSuffix(s, "-optimize")
 	s = strings.TrimSpace(s)
 	return s
