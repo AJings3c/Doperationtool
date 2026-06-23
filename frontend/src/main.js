@@ -4753,6 +4753,7 @@ function saveFingerGovState(s) {
 }
 const fingerGovState = loadFingerGovState();
 let lastFingerprintImportPreview = null;
+let lastFingerprintReview = null;
 let lastCapabilityScan = null;
 let lastCapabilitySelection = null;
 let lastCapabilityApplyResult = null;
@@ -4988,12 +4989,37 @@ function setupDDDDFingerprintConverter() {
             await applyImport(elRoot.value.trim());
             return;
         }
+        const removeBtn = e.target.closest && e.target.closest('.fg-import-remove');
+        if (removeBtn && elResult.contains(removeBtn)) {
+            removeFingerprintReviewItem(removeBtn.dataset.product || '', removeBtn.dataset.rel || '');
+            renderFingerprintImportPreview(lastFingerprintReview, elSummary, elResult);
+            return;
+        }
+        const restoreBtn = e.target.closest && e.target.closest('.fg-import-restore');
+        if (restoreBtn && elResult.contains(restoreBtn)) {
+            restoreFingerprintReviewItem(restoreBtn.dataset.product || '', restoreBtn.dataset.rel || '');
+            renderFingerprintImportPreview(lastFingerprintReview, elSummary, elResult);
+            return;
+        }
         const btn = e.target.closest && e.target.closest('button[data-copy]');
         if (!btn || !elResult.contains(btn)) return;
         const text = btn.dataset.copy === 'yaml'
-            ? (lastFingerprintImportPreview && lastFingerprintImportPreview.ddddYaml) || ''
-            : (lastFingerprintImportPreview && lastFingerprintImportPreview.patchPreview) || '';
+            ? (lastFingerprintReview && lastFingerprintReview.ddddYaml) || ''
+            : (lastFingerprintReview && lastFingerprintReview.patchPreview) || '';
         if (text) copyToClipboard(text, btn.dataset.copy === 'yaml' ? 'finger.yaml' : 'Patch 预览');
+    });
+    elResult.addEventListener('contextmenu', (e) => {
+        const row = e.target.closest && e.target.closest('[data-finger-product]');
+        if (!row || !elResult.contains(row)) return;
+        e.preventDefault();
+        const product = row.dataset.fingerProduct || '';
+        const rel = row.dataset.fingerRel || '';
+        showContextMenu(e.clientX, e.clientY, [
+            { label: '从本次指纹审核中移除', danger: true, onClick: () => {
+                removeFingerprintReviewItem(product, rel);
+                renderFingerprintImportPreview(lastFingerprintReview, elSummary, elResult);
+            } },
+        ]);
     });
 
     async function runPreview(sourceDir) {
@@ -5025,7 +5051,8 @@ function setupDDDDFingerprintConverter() {
         try {
             const r = await PreviewFingerprintImport(root, sourceDir);
             lastFingerprintImportPreview = r;
-            renderFingerprintImportPreview(r, elSummary, elResult);
+            lastFingerprintReview = createFingerprintReviewState(r);
+            renderFingerprintImportPreview(lastFingerprintReview, elSummary, elResult);
             if (root) pushFingerHistory('history', 'root', root);
             pushFingerHistory('importHistory', 'importDir', sourceDir);
             renderHistories();
@@ -5043,7 +5070,7 @@ function setupDDDDFingerprintConverter() {
     }
 
     async function applyImport(projectRoot) {
-        if (!lastFingerprintImportPreview || !lastFingerprintImportPreview.ddddYaml) {
+        if (!lastFingerprintReview || !lastFingerprintReview.ddddYaml) {
             toast('请先完成一次转换预览', 'error');
             return;
         }
@@ -5062,7 +5089,7 @@ function setupDDDDFingerprintConverter() {
         try {
             const r = await ApplyFingerprintImport({
                 projectRoot,
-                ddddYaml: lastFingerprintImportPreview.ddddYaml,
+                ddddYaml: lastFingerprintReview.ddddYaml,
                 confirm: true,
                 confirmation,
             });
@@ -5084,7 +5111,7 @@ function setupDDDDFingerprintConverter() {
     }
 
     async function saveFingerprintReview() {
-        if (!lastFingerprintImportPreview || !lastFingerprintImportPreview.ddddYaml) {
+        if (!lastFingerprintReview || !lastFingerprintReview.ddddYaml) {
             toast('请先完成一次转换预览', 'error');
             return;
         }
@@ -5093,9 +5120,9 @@ function setupDDDDFingerprintConverter() {
             const r = await SaveExternalFingerprintReview({
                 projectRoot: elRoot.value.trim(),
                 sourceDir: elSrc.value.trim(),
-                items: lastFingerprintImportPreview.items || [],
-                ddddYaml: lastFingerprintImportPreview.ddddYaml,
-                removed: [],
+                items: lastFingerprintReview.items || [],
+                ddddYaml: lastFingerprintReview.ddddYaml,
+                removed: lastFingerprintReview.removed || [],
             });
             pushFingerHistory('fingerReviewHistory', 'fingerReviewDir', r.dir || '');
             toast(`✅ 指纹审核结果已保存: ${r.dir}`, 'success');
@@ -5719,6 +5746,69 @@ function renderPocDuplicateTable(title, total, items) {
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
+function createFingerprintReviewState(preview) {
+    const items = (preview && preview.items || []).map((x) => ({ ...x }));
+    const state = {
+        ...preview,
+        allItems: items,
+        removedKeys: new Set(),
+        removedItems: [],
+        removed: [],
+    };
+    return rebuildFingerprintReviewState(state);
+}
+
+function fingerprintReviewItemKey(itemOrProduct, relPath) {
+    if (typeof itemOrProduct === 'object') {
+        return `${itemOrProduct.product || ''}\u0000${itemOrProduct.relPath || itemOrProduct.path || ''}`;
+    }
+    return `${itemOrProduct || ''}\u0000${relPath || ''}`;
+}
+
+function rebuildFingerprintReviewState(state) {
+    const active = (state.allItems || []).filter((x) => !state.removedKeys.has(fingerprintReviewItemKey(x)));
+    const removedItems = (state.allItems || []).filter((x) => state.removedKeys.has(fingerprintReviewItemKey(x)));
+    state.items = active;
+    state.removedItems = removedItems;
+    state.removed = removedItems.map((x) => ({
+        path: x.path || '',
+        relPath: x.relPath || x.product || '',
+        reason: '人工从本次指纹审核移除',
+    }));
+    state.ddddYaml = renderFingerprintReviewYaml(active);
+    state.candidateCount = active.length;
+    state.productCount = active.length;
+    state.ruleCount = active.reduce((n, x) => n + ((x.rules || []).length), 0);
+    state.highConfidenceCount = active.filter((x) => x.quality === 'high').length;
+    state.genericRuleCount = active.reduce((n, x) => n + ((x.rules || []).filter((rule) => rule && rule.generic).length), 0);
+    return state;
+}
+
+function removeFingerprintReviewItem(product, relPath) {
+    if (!lastFingerprintReview) return;
+    const key = fingerprintReviewItemKey(product, relPath);
+    lastFingerprintReview.removedKeys.add(key);
+    rebuildFingerprintReviewState(lastFingerprintReview);
+    toast(`已从本次指纹审核移除: ${product || relPath}`, 'info');
+}
+
+function restoreFingerprintReviewItem(product, relPath) {
+    if (!lastFingerprintReview) return;
+    const key = fingerprintReviewItemKey(product, relPath);
+    lastFingerprintReview.removedKeys.delete(key);
+    rebuildFingerprintReviewState(lastFingerprintReview);
+    toast(`已恢复到本次指纹审核: ${product || relPath}`, 'success');
+}
+
+function renderFingerprintReviewYaml(items) {
+    const list = (items || []).filter((x) => x && x.product && (x.rules || []).length);
+    if (!list.length) return '';
+    return list.map((item) => [
+        `${yamlSingleQuote(item.product)}:`,
+        ...(item.rules || []).map((rule) => `  - ${yamlSingleQuote(rule.expression || rule.original || '')}`),
+    ].join('\n')).join('\n\n') + '\n';
+}
+
 function renderFingerprintImportPreview(r, elSummary, elResult) {
     const stat = (label, value, tone = '') => `
         <div class="fg-stat ${tone}">
@@ -5737,6 +5827,7 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
             ${stat('泛化规则', r.genericRuleCount || 0, (r.genericRuleCount || 0) ? 'fg-warn' : 'fg-good')}
             ${stat('重复规则', r.duplicateRuleCount || 0, (r.duplicateRuleCount || 0) ? 'fg-warn' : 'fg-good')}
             ${stat('合并建议', r.mergeSuggestionCount || 0, (r.mergeSuggestionCount || 0) ? 'fg-warn' : 'fg-good')}
+            ${stat('已移除', (r.removedItems || []).length || 0, (r.removedItems || []).length ? 'fg-warn' : 'fg-good')}
         </div>
         <div class="fg-paths">
             <div><b>source:</b> <code>${escapeHtml(r.sourceDir || '')}</code></div>
@@ -5747,7 +5838,7 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
         const firstRules = (x.rules || []).slice(0, 3).map((rule) => rule.expression).join('\n');
         const warn = (x.warnings || []).join('\n');
         return `
-        <tr>
+        <tr data-finger-product="${escapeHtml(x.product || '')}" data-finger-rel="${escapeHtml(x.relPath || x.path || '')}">
             <td title="${escapeHtml(x.product || '')}">${escapeHtml(x.product || '')}</td>
             <td title="${escapeHtml(x.normalizedProduct || '')}">${escapeHtml(x.normalizedProduct || '')}</td>
             <td><span class="fg-quality fg-quality-${escapeHtml(x.quality || 'low')}">${escapeHtml(x.quality || '')} ${escapeHtml(x.qualityScore || 0)}</span></td>
@@ -5755,12 +5846,13 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
             <td title="${escapeHtml(x.relPath || '')}">${escapeHtml(x.relPath || '')}</td>
             <td title="${escapeHtml(firstRules)}">${escapeHtml(firstRules || '-')}</td>
             <td title="${escapeHtml(warn)}">${escapeHtml(warn || '-')}</td>
+            <td><button class="fg-copy-object fg-import-remove" data-product="${escapeHtml(x.product || '')}" data-rel="${escapeHtml(x.relPath || x.path || '')}">移除</button></td>
         </tr>`;
     }).join('');
     const itemsBody = itemRows ? `
         <div class="fg-table-wrap">
         <table class="fg-table fg-import-items">
-            <thead><tr><th>产品</th><th>归一化</th><th>质量</th><th>规则</th><th>来源</th><th>规则示例</th><th>提示</th></tr></thead>
+            <thead><tr><th>产品</th><th>归一化</th><th>质量</th><th>规则</th><th>来源</th><th>规则示例</th><th>提示</th><th>操作</th></tr></thead>
             <tbody>${itemRows}</tbody>
         </table></div>` : '';
 
@@ -5771,6 +5863,19 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
     ]);
     const duplicateBody = renderFingerprintTable('导入重复规则', r.duplicateRuleCount, r.duplicateRules, ['规则', '产品'], (x) => [x.rule, (x.products || []).join(', ')]);
     const skippedBody = renderFingerprintTable('跳过文件', r.skippedFiles, r.skipped, ['文件', '原因'], (x) => [x.relPath || x.path, x.reason]);
+    const removedRows = (r.removedItems || []).map((x) => `
+        <tr>
+            <td title="${escapeHtml(x.product || '')}">${escapeHtml(x.product || '')}</td>
+            <td title="${escapeHtml(x.relPath || x.path || '')}">${escapeHtml(x.relPath || x.path || '-')}</td>
+            <td>${escapeHtml((x.rules || []).length)}</td>
+            <td><button class="fg-copy-object fg-import-restore" data-product="${escapeHtml(x.product || '')}" data-rel="${escapeHtml(x.relPath || x.path || '')}">恢复</button></td>
+        </tr>`).join('');
+    const removedBody = removedRows ? renderFingerprintSection('已移除指纹候选', (r.removedItems || []).length, `
+        <div class="fg-table-wrap">
+        <table class="fg-table">
+            <thead><tr><th>产品</th><th>来源</th><th>规则</th><th>操作</th></tr></thead>
+            <tbody>${removedRows}</tbody>
+        </table></div>`, (r.removedItems || []).length) : '';
     const yamlText = r.ddddYaml || '';
     const patchText = r.patchPreview || '';
     const yamlPreview = yamlText.length > 200000 ? yamlText.slice(0, 200000) + '\n... (预览已截断，复制按钮仍复制完整 YAML)' : yamlText;
@@ -5781,7 +5886,11 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
             <div class="fg-code-actions"><button class="fg-reveal" data-copy="yaml">复制 YAML</button></div>
             <pre id="fg-import-yaml" class="fg-code">${escapeHtml(yamlPreview)}</pre>
         </details>`;
-    const patchBlock = `
+    const patchBlock = (r.removedItems || []).length ? `
+        <details class="fg-section fg-code-section">
+            <summary>Patch / 写回预览 <span>已人工调整</span></summary>
+            <div class="fg-empty">已移除部分指纹候选，原始 dry-run patch 不再展示；写回和保存会使用当前 finger.yaml 预览内容。</div>
+        </details>` : `
         <details class="fg-section fg-code-section">
             <summary>Patch / 写回预览 <span>dry-run${patchText.length > patchPreview.length ? ' · 已截断展示' : ''}</span></summary>
             <div class="fg-code-actions"><button class="fg-reveal" data-copy="patch">复制 Patch 预览</button></div>
@@ -5805,6 +5914,7 @@ function renderFingerprintImportPreview(r, elSummary, elResult) {
             ${mergeBody}
             ${duplicateBody}
             ${skippedBody}
+            ${removedBody}
         </div>`,
         yamlBlock,
         patchBlock,
