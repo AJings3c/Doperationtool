@@ -44,9 +44,13 @@ export function OpenWithDefaultApp(arg1:string):Promise<void>;
 
 export function PreviewFingerprintImport(arg1:string,arg2:string):Promise<main.FingerprintImportPreviewResult>;
 
+export function PreviewDirImport(arg1:string,arg2:string):Promise<main.DirImportPreviewResult>;
+
 export function RevealInFileManager(arg1:string):Promise<void>;
 
 export function RestoreExternalCapabilityBackup(arg1:main.RestoreExternalCapabilityBackupRequest):Promise<main.RestoreExternalCapabilityBackupResult>;
+
+export function SaveExternalDirReview(arg1:main.SaveExternalDirReviewRequest):Promise<main.SavedReviewResult>;
 
 export function SaveExternalFingerprintReview(arg1:main.SaveExternalFingerprintReviewRequest):Promise<main.SavedReviewResult>;
 
@@ -58,7 +62,7 @@ export function SaveYamlBatch(arg1:string,arg2:Array<main.YamlOutFile>):Promise<
 
 export function ScanDuplicateTemplates(arg1:string):Promise<main.DupScanResult>;
 
-export function ScanExternalCapability(arg1:string,arg2:string,arg3:string):Promise<main.ExternalCapabilityScanResult>;
+export function ScanExternalCapability(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.ExternalCapabilityScanResult>;
 
 export function ScanTemplateCategories(arg1:string):Promise<main.CategoryScanResult>;
 

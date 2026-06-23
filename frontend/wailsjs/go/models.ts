@@ -165,6 +165,7 @@ export namespace main {
 	export class ApplyExternalCapabilityRequest {
 	    projectRoot: string;
 	    newFingerYaml: string;
+	    newDirYaml: string;
 	    newPocs: ExternalPocNewItem[];
 	    confirm: boolean;
 	    confirmation: string;
@@ -177,6 +178,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectRoot = source["projectRoot"];
 	        this.newFingerYaml = source["newFingerYaml"];
+	        this.newDirYaml = source["newDirYaml"];
 	        this.newPocs = this.convertValues(source["newPocs"], ExternalPocNewItem);
 	        this.confirm = source["confirm"];
 	        this.confirmation = source["confirmation"];
@@ -211,6 +213,8 @@ export namespace main {
 	    workflowSuggestionCount: number;
 	    fingerWithoutWorkflowCount: number;
 	    workflowWithoutFingerCount: number;
+	    recognitionWithoutWorkflowCount: number;
+	    workflowWithoutRecognitionCount: number;
 	    elapsed: string;
 
 	    static createFrom(source: any = {}) {
@@ -229,12 +233,15 @@ export namespace main {
 	        this.workflowSuggestionCount = source["workflowSuggestionCount"];
 	        this.fingerWithoutWorkflowCount = source["fingerWithoutWorkflowCount"];
 	        this.workflowWithoutFingerCount = source["workflowWithoutFingerCount"];
+	        this.recognitionWithoutWorkflowCount = source["recognitionWithoutWorkflowCount"];
+	        this.workflowWithoutRecognitionCount = source["workflowWithoutRecognitionCount"];
 	        this.elapsed = source["elapsed"];
 	    }
 	}
 	export class RestoreExternalCapabilityBackupRequest {
 	    projectRoot: string;
 	    fingerBackupPath: string;
+	    dirBackupPath: string;
 	    workflowBackupPath: string;
 	    confirm: boolean;
 	    confirmation: string;
@@ -247,6 +254,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectRoot = source["projectRoot"];
 	        this.fingerBackupPath = source["fingerBackupPath"];
+	        this.dirBackupPath = source["dirBackupPath"];
 	        this.workflowBackupPath = source["workflowBackupPath"];
 	        this.confirm = source["confirm"];
 	        this.confirmation = source["confirmation"];
@@ -254,8 +262,10 @@ export namespace main {
 	}
 	export class RestoreExternalCapabilityBackupResult {
 	    restoredFinger: boolean;
+	    restoredDir: boolean;
 	    restoredWorkflow: boolean;
 	    fingerCurrentBackupPath: string;
+	    dirCurrentBackupPath: string;
 	    workflowCurrentBackupPath: string;
 	    logPath: string;
 
@@ -266,20 +276,27 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.restoredFinger = source["restoredFinger"];
+	        this.restoredDir = source["restoredDir"];
 	        this.restoredWorkflow = source["restoredWorkflow"];
 	        this.fingerCurrentBackupPath = source["fingerCurrentBackupPath"];
+	        this.dirCurrentBackupPath = source["dirCurrentBackupPath"];
 	        this.workflowCurrentBackupPath = source["workflowCurrentBackupPath"];
 	        this.logPath = source["logPath"];
 	    }
 	}
 	export class ApplyExternalCapabilityResult {
 	    fingerBackupPath: string;
+	    dirBackupPath: string;
 	    workflowBackupPath: string;
 	    pocTargetDir: string;
 	    productsCreated: number;
 	    productsMerged: number;
 	    rulesAdded: number;
 	    rulesSkipped: number;
+	    dirProductsCreated: number;
+	    dirProductsMerged: number;
+	    dirPathsAdded: number;
+	    dirPathsSkipped: number;
 	    pocsCopied: number;
 	    workflowProducts: number;
 	    logPath: string;
@@ -295,12 +312,17 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fingerBackupPath = source["fingerBackupPath"];
+	        this.dirBackupPath = source["dirBackupPath"];
 	        this.workflowBackupPath = source["workflowBackupPath"];
 	        this.pocTargetDir = source["pocTargetDir"];
 	        this.productsCreated = source["productsCreated"];
 	        this.productsMerged = source["productsMerged"];
 	        this.rulesAdded = source["rulesAdded"];
 	        this.rulesSkipped = source["rulesSkipped"];
+	        this.dirProductsCreated = source["dirProductsCreated"];
+	        this.dirProductsMerged = source["dirProductsMerged"];
+	        this.dirPathsAdded = source["dirPathsAdded"];
+	        this.dirPathsSkipped = source["dirPathsSkipped"];
 	        this.pocsCopied = source["pocsCopied"];
 	        this.workflowProducts = source["workflowProducts"];
 	        this.logPath = source["logPath"];
@@ -865,15 +887,88 @@ export namespace main {
 	        this.rules = source["rules"];
 	    }
 	}
+	export class dirEntryView {
+	    product: string;
+	    paths: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new dirEntryView(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.product = source["product"];
+	        this.paths = source["paths"];
+	    }
+	}
+	export class DirImportPreviewResult {
+	    sourceDir: string;
+	    projectRoot: string;
+	    targetDirPath: string;
+	    scannedFiles: number;
+	    parsedFiles: number;
+	    skippedFiles: number;
+	    productCount: number;
+	    pathCount: number;
+	    duplicatePathCount: number;
+	    items: dirEntryView[];
+	    skipped: FingerprintImportSkip[];
+	    dirYaml: string;
+	    elapsed: string;
+
+	    static createFrom(source: any = {}) {
+	        return new DirImportPreviewResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceDir = source["sourceDir"];
+	        this.projectRoot = source["projectRoot"];
+	        this.targetDirPath = source["targetDirPath"];
+	        this.scannedFiles = source["scannedFiles"];
+	        this.parsedFiles = source["parsedFiles"];
+	        this.skippedFiles = source["skippedFiles"];
+	        this.productCount = source["productCount"];
+	        this.pathCount = source["pathCount"];
+	        this.duplicatePathCount = source["duplicatePathCount"];
+	        this.items = this.convertValues(source["items"], dirEntryView);
+	        this.skipped = this.convertValues(source["skipped"], FingerprintImportSkip);
+	        this.dirYaml = source["dirYaml"];
+	        this.elapsed = source["elapsed"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ExternalCapabilityScanResult {
 	    projectRoot: string;
 	    pocReviewDir: string;
 	    fingerReviewDir: string;
+	    dirReviewDir: string;
 	    newFingerProducts: number;
 	    newFingerRules: number;
+	    newDirProducts: number;
+	    newDirPaths: number;
 	    newPocCount: number;
 	    newFingerYaml: string;
+	    newDirYaml: string;
 	    newFingers: fingerEntryView[];
+	    newDirs: dirEntryView[];
 	    newPocs: ExternalPocNewItem[];
 	    pocApplyPlan: ExternalPocPlan[];
 	    logPath: string;
@@ -887,11 +982,16 @@ export namespace main {
 	        this.projectRoot = source["projectRoot"];
 	        this.pocReviewDir = source["pocReviewDir"];
 	        this.fingerReviewDir = source["fingerReviewDir"];
+	        this.dirReviewDir = source["dirReviewDir"];
 	        this.newFingerProducts = source["newFingerProducts"];
 	        this.newFingerRules = source["newFingerRules"];
+	        this.newDirProducts = source["newDirProducts"];
+	        this.newDirPaths = source["newDirPaths"];
 	        this.newPocCount = source["newPocCount"];
 	        this.newFingerYaml = source["newFingerYaml"];
+	        this.newDirYaml = source["newDirYaml"];
 	        this.newFingers = this.convertValues(source["newFingers"], fingerEntryView);
+	        this.newDirs = this.convertValues(source["newDirs"], dirEntryView);
 	        this.newPocs = this.convertValues(source["newPocs"], ExternalPocNewItem);
 	        this.pocApplyPlan = this.convertValues(source["pocApplyPlan"], ExternalPocPlan);
 	        this.logPath = source["logPath"];
@@ -1053,6 +1153,7 @@ export namespace main {
 	    confidence: number;
 	    reason: string;
 	    path: string;
+	    source?: string;
 
 	    static createFrom(source: any = {}) {
 	        return new FingerprintPocFingerMatch(source);
@@ -1067,6 +1168,7 @@ export namespace main {
 	        this.confidence = source["confidence"];
 	        this.reason = source["reason"];
 	        this.path = source["path"];
+	        this.source = source["source"];
 	    }
 	}
 	export class FingerprintPocInfo {
@@ -1080,6 +1182,7 @@ export namespace main {
 	    referencedByWorkflow: boolean;
 	    workflowProducts: string[];
 	    matchedProduct: string;
+	    matchSource?: string;
 	    matchConfidence: number;
 	    matchReason: string;
 	    incomplete: boolean;
@@ -1106,6 +1209,7 @@ export namespace main {
 	        this.referencedByWorkflow = source["referencedByWorkflow"];
 	        this.workflowProducts = source["workflowProducts"];
 	        this.matchedProduct = source["matchedProduct"];
+	        this.matchSource = source["matchSource"];
 	        this.matchConfidence = source["matchConfidence"];
 	        this.matchReason = source["matchReason"];
 	        this.incomplete = source["incomplete"];
@@ -1134,10 +1238,17 @@ export namespace main {
 	export class FingerprintAuditResult {
 	    projectRoot: string;
 	    fingerPath: string;
+	    dirPath: string;
 	    workflowPath: string;
 	    pocDir: string;
 	    fingerCount: number;
 	    fingerRuleCount: number;
+	    dirCount: number;
+	    dirPathCount: number;
+	    recognitionProductCount: number;
+	    fingerOnlyProductCount: number;
+	    dirOnlyProductCount: number;
+	    fingerDirProductCount: number;
 	    workflowCount: number;
 	    workflowPocRefCount: number;
 	    pocFileCount: number;
@@ -1146,6 +1257,8 @@ export namespace main {
 	    orphanPocCount: number;
 	    fingerWithoutWorkflowCount: number;
 	    workflowWithoutFingerCount: number;
+	    recognitionWithoutWorkflowCount: number;
+	    workflowWithoutRecognitionCount: number;
 	    fingerWithoutPocCount: number;
 	    pocWithFingerCount: number;
 	    pocWithFingerWorkflowCount: number;
@@ -1165,6 +1278,8 @@ export namespace main {
 	    orphanPocs: FingerprintPocInfo[];
 	    fingerWithoutWorkflow: string[];
 	    workflowWithoutFinger: string[];
+	    recognitionWithoutWorkflow: string[];
+	    workflowWithoutRecognition: string[];
 	    fingerWithoutPoc: string[];
 	    pocWithFinger: FingerprintPocFingerMatch[];
 	    pocWithFingerWorkflow: FingerprintPocFingerMatch[];
@@ -1191,10 +1306,17 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectRoot = source["projectRoot"];
 	        this.fingerPath = source["fingerPath"];
+	        this.dirPath = source["dirPath"];
 	        this.workflowPath = source["workflowPath"];
 	        this.pocDir = source["pocDir"];
 	        this.fingerCount = source["fingerCount"];
 	        this.fingerRuleCount = source["fingerRuleCount"];
+	        this.dirCount = source["dirCount"];
+	        this.dirPathCount = source["dirPathCount"];
+	        this.recognitionProductCount = source["recognitionProductCount"];
+	        this.fingerOnlyProductCount = source["fingerOnlyProductCount"];
+	        this.dirOnlyProductCount = source["dirOnlyProductCount"];
+	        this.fingerDirProductCount = source["fingerDirProductCount"];
 	        this.workflowCount = source["workflowCount"];
 	        this.workflowPocRefCount = source["workflowPocRefCount"];
 	        this.pocFileCount = source["pocFileCount"];
@@ -1203,6 +1325,8 @@ export namespace main {
 	        this.orphanPocCount = source["orphanPocCount"];
 	        this.fingerWithoutWorkflowCount = source["fingerWithoutWorkflowCount"];
 	        this.workflowWithoutFingerCount = source["workflowWithoutFingerCount"];
+	        this.recognitionWithoutWorkflowCount = source["recognitionWithoutWorkflowCount"];
+	        this.workflowWithoutRecognitionCount = source["workflowWithoutRecognitionCount"];
 	        this.fingerWithoutPocCount = source["fingerWithoutPocCount"];
 	        this.pocWithFingerCount = source["pocWithFingerCount"];
 	        this.pocWithFingerWorkflowCount = source["pocWithFingerWorkflowCount"];
@@ -1222,6 +1346,8 @@ export namespace main {
 	        this.orphanPocs = this.convertValues(source["orphanPocs"], FingerprintPocInfo);
 	        this.fingerWithoutWorkflow = source["fingerWithoutWorkflow"];
 	        this.workflowWithoutFinger = source["workflowWithoutFinger"];
+	        this.recognitionWithoutWorkflow = source["recognitionWithoutWorkflow"];
+	        this.workflowWithoutRecognition = source["workflowWithoutRecognition"];
 	        this.fingerWithoutPoc = source["fingerWithoutPoc"];
 	        this.pocWithFinger = this.convertValues(source["pocWithFinger"], FingerprintPocFingerMatch);
 	        this.pocWithFingerWorkflow = this.convertValues(source["pocWithFingerWorkflow"], FingerprintPocFingerMatch);
@@ -1513,9 +1639,13 @@ export namespace main {
 	    sourceType: string;
 	    sourceDir: string;
 	    fingerPath: string;
+	    dirPath: string;
 	    workflowPath: string;
 	    pocDir: string;
 	    fingerCount: number;
+	    dirCount: number;
+	    dirPathCount: number;
+	    recognitionProductCount: number;
 	    workflowCount: number;
 	    pocFileCount: number;
 	    uniquePocCount: number;
@@ -1544,9 +1674,13 @@ export namespace main {
 	        this.sourceType = source["sourceType"];
 	        this.sourceDir = source["sourceDir"];
 	        this.fingerPath = source["fingerPath"];
+	        this.dirPath = source["dirPath"];
 	        this.workflowPath = source["workflowPath"];
 	        this.pocDir = source["pocDir"];
 	        this.fingerCount = source["fingerCount"];
+	        this.dirCount = source["dirCount"];
+	        this.dirPathCount = source["dirPathCount"];
+	        this.recognitionProductCount = source["recognitionProductCount"];
 	        this.workflowCount = source["workflowCount"];
 	        this.pocFileCount = source["pocFileCount"];
 	        this.uniquePocCount = source["uniquePocCount"];
@@ -1799,6 +1933,44 @@ export namespace main {
 	        this.relPath = source["relPath"];
 	        this.reason = source["reason"];
 	    }
+	}
+	export class SaveExternalDirReviewRequest {
+	    projectRoot: string;
+	    sourceDir: string;
+	    items: dirEntryView[];
+	    dirYaml: string;
+	    removed: ReviewRemovedItem[];
+
+	    static createFrom(source: any = {}) {
+	        return new SaveExternalDirReviewRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.sourceDir = source["sourceDir"];
+	        this.items = this.convertValues(source["items"], dirEntryView);
+	        this.dirYaml = source["dirYaml"];
+	        this.removed = this.convertValues(source["removed"], ReviewRemovedItem);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SaveExternalFingerprintReviewRequest {
 	    projectRoot: string;

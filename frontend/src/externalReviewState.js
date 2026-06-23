@@ -52,6 +52,7 @@ export function renderFingerprintReviewYaml(items) {
 export function buildExternalCapabilitySelection(r) {
     return {
         fingerProducts: new Set((r.newFingers || []).map((x) => x.product || '').filter(Boolean)),
+        dirProducts: new Set((r.newDirs || []).map((x) => x.product || '').filter(Boolean)),
         pocPaths: new Set((r.newPocs || []).map((x) => x.path || '').filter(Boolean)),
     };
 }
@@ -64,9 +65,14 @@ export function isExternalPocSelected(selection, path) {
     return !!(selection && selection.pocPaths && selection.pocPaths.has(path || ''));
 }
 
+export function isExternalDirSelected(selection, product) {
+    return !!(selection && selection.dirProducts && selection.dirProducts.has(product || ''));
+}
+
 export function updateExternalCapabilitySelectionState(selection, kind, key, checked) {
-    const next = selection || { fingerProducts: new Set(), pocPaths: new Set() };
-    const set = kind === 'finger' ? next.fingerProducts : next.pocPaths;
+    const next = selection || { fingerProducts: new Set(), dirProducts: new Set(), pocPaths: new Set() };
+    if (!next.dirProducts) next.dirProducts = new Set();
+    const set = kind === 'finger' ? next.fingerProducts : (kind === 'dir' ? next.dirProducts : next.pocPaths);
     if (!key) return next;
     if (checked) set.add(key);
     else set.delete(key);
@@ -78,6 +84,10 @@ export function toggleExternalCapabilitySelectionState(scan, selection, kind, ch
     if (kind === 'finger') {
         next.fingerProducts = checked
             ? new Set((scan.newFingers || []).map((x) => x.product || '').filter(Boolean))
+            : new Set();
+    } else if (kind === 'dir') {
+        next.dirProducts = checked
+            ? new Set((scan.newDirs || []).map((x) => x.product || '').filter(Boolean))
             : new Set();
     } else if (kind === 'poc') {
         next.pocPaths = checked
@@ -91,6 +101,7 @@ export function selectedExternalCapability(scan, selection) {
     const effective = selection || buildExternalCapabilitySelection(scan);
     return {
         fingers: (scan.newFingers || []).filter((x) => isExternalFingerSelected(effective, x.product)),
+        dirs: (scan.newDirs || []).filter((x) => isExternalDirSelected(effective, x.product)),
         pocs: (scan.newPocs || []).filter((x) => isExternalPocSelected(effective, x.path)),
     };
 }
@@ -106,5 +117,14 @@ export function renderExternalFingerYaml(fingers) {
     return list.map((entry) => [
         `${yamlSingleQuote(entry.product)}:`,
         ...(entry.rules || []).map((rule) => `  - ${yamlSingleQuote(rule)}`),
+    ].join('\n')).join('\n\n') + '\n';
+}
+
+export function renderExternalDirYaml(dirs) {
+    const list = (dirs || []).filter((x) => x && x.product && (x.paths || []).length);
+    if (!list.length) return '';
+    return list.map((entry) => [
+        `${yamlSingleQuote(entry.product)}:`,
+        ...(entry.paths || []).map((path) => `  - ${yamlSingleQuote(path)}`),
     ].join('\n')).join('\n\n') + '\n';
 }

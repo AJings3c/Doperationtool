@@ -15,11 +15,15 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeTestFile(t, filepath.Join(cfgDir, "finger.yaml"), "Alpha:\n  - 'title=\"Alpha\"'\n")
+	writeTestFile(t, filepath.Join(cfgDir, "dir.yaml"), "Alpha:\n  - /alpha-old\n")
 	writeTestFile(t, filepath.Join(cfgDir, "workflow.yaml"), "Alpha:\n  type:\n    - http\n  pocs:\n    - alpha-old\n")
 	writeTestFile(t, filepath.Join(pocDir, "alpha-old.yaml"), "id: alpha-old\ninfo:\n  name: Alpha Old\n  severity: low\nhttp:\n  - matchers:\n      - type: word\n        words: [Alpha]\n")
 
 	fingerReviewDir := t.TempDir()
 	writeTestFile(t, filepath.Join(fingerReviewDir, "finger.yaml"), "Alpha:\n  - 'body=\"Alpha New\"'\nBeta:\n  - 'title=\"Beta\"'\n")
+
+	dirReviewDir := t.TempDir()
+	writeTestFile(t, filepath.Join(dirReviewDir, "dir.yaml"), "Alpha:\n  - /alpha-new\nBeta:\n  - /beta/login\n")
 
 	pocReviewDir := t.TempDir()
 	reviewPocPath := filepath.Join(pocReviewDir, "pocs", "Beta", "source-file.yaml")
@@ -50,11 +54,11 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	}
 
 	app := NewApp()
-	scan, err := app.ScanExternalCapability(root, pocReviewDir, fingerReviewDir)
+	scan, err := app.ScanExternalCapability(root, pocReviewDir, fingerReviewDir, dirReviewDir)
 	if err != nil {
 		t.Fatalf("ScanExternalCapability returned error: %v", err)
 	}
-	if scan.NewFingerProducts != 2 || scan.NewFingerRules != 2 || scan.NewPocCount != 1 {
+	if scan.NewFingerProducts != 2 || scan.NewFingerRules != 2 || scan.NewDirProducts != 2 || scan.NewDirPaths != 2 || scan.NewPocCount != 1 {
 		t.Fatalf("scan stats = %#v", scan)
 	}
 	if len(scan.PocApplyPlan) != 1 || scan.PocApplyPlan[0].TargetName != "new-poc.yaml" || scan.PocApplyPlan[0].ConflictRenamed {
@@ -66,6 +70,7 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	apply, err := app.ApplyExternalCapability(ApplyExternalCapabilityRequest{
 		ProjectRoot:   root,
 		NewFingerYaml: scan.NewFingerYaml,
+		NewDirYaml:    scan.NewDirYaml,
 		NewPocs:       scan.NewPocs,
 		Confirm:       true,
 		Confirmation:  "APPLY_EXTERNAL_CAPABILITY",
@@ -75,6 +80,9 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	}
 	if apply.PocTargetDir != pocDir || apply.PocsCopied != 1 || apply.WorkflowProducts != 1 {
 		t.Fatalf("apply result = %#v, want target %s", apply, pocDir)
+	}
+	if apply.DirPathsAdded != 2 || apply.DirBackupPath == "" {
+		t.Fatalf("dir apply result = %#v", apply)
 	}
 	if len(apply.PocApplyPlan) != 1 || apply.PocApplyPlan[0].TargetName != "new-poc-2.yaml" || !apply.PocApplyPlan[0].ConflictRenamed {
 		t.Fatalf("apply plan did not reflect final conflict-avoiding target: %#v", apply.PocApplyPlan)
@@ -109,10 +117,18 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	if got := string(fingerRaw); !strings.Contains(got, `body="Alpha New"`) || !strings.Contains(got, "Beta:") {
 		t.Fatalf("finger.yaml did not include merged rules:\n%s", got)
 	}
+	dirRaw, err := os.ReadFile(filepath.Join(cfgDir, "dir.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(dirRaw); !strings.Contains(got, "/alpha-new") || !strings.Contains(got, "Beta:") || !strings.Contains(got, "/beta/login") {
+		t.Fatalf("dir.yaml did not include merged paths:\n%s", got)
+	}
 
 	restore, err := app.RestoreExternalCapabilityBackup(RestoreExternalCapabilityBackupRequest{
 		ProjectRoot:        root,
 		FingerBackupPath:   apply.FingerBackupPath,
+		DirBackupPath:      apply.DirBackupPath,
 		WorkflowBackupPath: apply.WorkflowBackupPath,
 		Confirm:            true,
 		Confirmation:       "RESTORE_EXTERNAL_CAPABILITY",
@@ -120,7 +136,7 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RestoreExternalCapabilityBackup returned error: %v", err)
 	}
-	if !restore.RestoredFinger || !restore.RestoredWorkflow {
+	if !restore.RestoredFinger || !restore.RestoredDir || !restore.RestoredWorkflow {
 		t.Fatalf("restore result = %#v", restore)
 	}
 	if _, err := os.Stat(restore.FingerCurrentBackupPath); err != nil {
@@ -129,12 +145,22 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	if _, err := os.Stat(restore.WorkflowCurrentBackupPath); err != nil {
 		t.Fatalf("expected current workflow backup before restore: %v", err)
 	}
+	if _, err := os.Stat(restore.DirCurrentBackupPath); err != nil {
+		t.Fatalf("expected current dir backup before restore: %v", err)
+	}
 	fingerRaw, err = os.ReadFile(filepath.Join(cfgDir, "finger.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := string(fingerRaw); strings.Contains(got, "Beta:") || strings.Contains(got, `body="Alpha New"`) {
 		t.Fatalf("finger.yaml was not restored to pre-apply backup:\n%s", got)
+	}
+	dirRaw, err = os.ReadFile(filepath.Join(cfgDir, "dir.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(dirRaw); strings.Contains(got, "Beta:") || strings.Contains(got, "/alpha-new") {
+		t.Fatalf("dir.yaml was not restored to pre-apply backup:\n%s", got)
 	}
 	workflowRaw, err = os.ReadFile(filepath.Join(cfgDir, "workflow.yaml"))
 	if err != nil {

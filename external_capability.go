@@ -52,6 +52,14 @@ type SaveExternalFingerprintReviewRequest struct {
 	Removed     []ReviewRemovedItem     `json:"removed"`
 }
 
+type SaveExternalDirReviewRequest struct {
+	ProjectRoot string              `json:"projectRoot"`
+	SourceDir   string              `json:"sourceDir"`
+	Items       []dirEntryView      `json:"items"`
+	DirYaml     string              `json:"dirYaml"`
+	Removed     []ReviewRemovedItem `json:"removed"`
+}
+
 type storedFingerReview struct {
 	Kind        string                  `json:"kind"`
 	CreatedAt   string                  `json:"createdAt"`
@@ -62,15 +70,30 @@ type storedFingerReview struct {
 	Removed     []ReviewRemovedItem     `json:"removed"`
 }
 
+type storedDirReview struct {
+	Kind        string              `json:"kind"`
+	CreatedAt   string              `json:"createdAt"`
+	ProjectRoot string              `json:"projectRoot"`
+	SourceDir   string              `json:"sourceDir"`
+	Items       []dirEntryView      `json:"items"`
+	DirYaml     string              `json:"dirYaml"`
+	Removed     []ReviewRemovedItem `json:"removed"`
+}
+
 type ExternalCapabilityScanResult struct {
 	ProjectRoot       string               `json:"projectRoot"`
 	PocReviewDir      string               `json:"pocReviewDir"`
 	FingerReviewDir   string               `json:"fingerReviewDir"`
+	DirReviewDir      string               `json:"dirReviewDir"`
 	NewFingerProducts int                  `json:"newFingerProducts"`
 	NewFingerRules    int                  `json:"newFingerRules"`
+	NewDirProducts    int                  `json:"newDirProducts"`
+	NewDirPaths       int                  `json:"newDirPaths"`
 	NewPocCount       int                  `json:"newPocCount"`
 	NewFingerYaml     string               `json:"newFingerYaml"`
+	NewDirYaml        string               `json:"newDirYaml"`
 	NewFingers        []fingerEntryView    `json:"newFingers"`
+	NewDirs           []dirEntryView       `json:"newDirs"`
 	NewPocs           []ExternalPocNewItem `json:"newPocs"`
 	PocApplyPlan      []ExternalPocPlan    `json:"pocApplyPlan"`
 	LogPath           string               `json:"logPath"`
@@ -79,6 +102,11 @@ type ExternalCapabilityScanResult struct {
 type fingerEntryView struct {
 	Product string   `json:"product"`
 	Rules   []string `json:"rules"`
+}
+
+type dirEntryView struct {
+	Product string   `json:"product"`
+	Paths   []string `json:"paths"`
 }
 
 type ExternalPocNewItem struct {
@@ -106,6 +134,7 @@ type ExternalPocPlan struct {
 type ApplyExternalCapabilityRequest struct {
 	ProjectRoot   string               `json:"projectRoot"`
 	NewFingerYaml string               `json:"newFingerYaml"`
+	NewDirYaml    string               `json:"newDirYaml"`
 	NewPocs       []ExternalPocNewItem `json:"newPocs"`
 	Confirm       bool                 `json:"confirm"`
 	Confirmation  string               `json:"confirmation"`
@@ -113,12 +142,17 @@ type ApplyExternalCapabilityRequest struct {
 
 type ApplyExternalCapabilityResult struct {
 	FingerBackupPath   string                          `json:"fingerBackupPath"`
+	DirBackupPath      string                          `json:"dirBackupPath"`
 	WorkflowBackupPath string                          `json:"workflowBackupPath"`
 	PocTargetDir       string                          `json:"pocTargetDir"`
 	ProductsCreated    int                             `json:"productsCreated"`
 	ProductsMerged     int                             `json:"productsMerged"`
 	RulesAdded         int                             `json:"rulesAdded"`
 	RulesSkipped       int                             `json:"rulesSkipped"`
+	DirProductsCreated int                             `json:"dirProductsCreated"`
+	DirProductsMerged  int                             `json:"dirProductsMerged"`
+	DirPathsAdded      int                             `json:"dirPathsAdded"`
+	DirPathsSkipped    int                             `json:"dirPathsSkipped"`
 	PocsCopied         int                             `json:"pocsCopied"`
 	WorkflowProducts   int                             `json:"workflowProducts"`
 	LogPath            string                          `json:"logPath"`
@@ -129,22 +163,25 @@ type ApplyExternalCapabilityResult struct {
 }
 
 type ExternalCapabilityAuditSummary struct {
-	Passed                     bool   `json:"passed"`
-	IssueCount                 int    `json:"issueCount"`
-	MissingPocCount            int    `json:"missingPocCount"`
-	VirtualPocCount            int    `json:"virtualPocCount"`
-	IncompletePocCount         int    `json:"incompletePocCount"`
-	PocWithoutFingerCount      int    `json:"pocWithoutFingerCount"`
-	FingerWithoutPocCount      int    `json:"fingerWithoutPocCount"`
-	WorkflowSuggestionCount    int    `json:"workflowSuggestionCount"`
-	FingerWithoutWorkflowCount int    `json:"fingerWithoutWorkflowCount"`
-	WorkflowWithoutFingerCount int    `json:"workflowWithoutFingerCount"`
-	Elapsed                    string `json:"elapsed"`
+	Passed                          bool   `json:"passed"`
+	IssueCount                      int    `json:"issueCount"`
+	MissingPocCount                 int    `json:"missingPocCount"`
+	VirtualPocCount                 int    `json:"virtualPocCount"`
+	IncompletePocCount              int    `json:"incompletePocCount"`
+	PocWithoutFingerCount           int    `json:"pocWithoutFingerCount"`
+	FingerWithoutPocCount           int    `json:"fingerWithoutPocCount"`
+	WorkflowSuggestionCount         int    `json:"workflowSuggestionCount"`
+	FingerWithoutWorkflowCount      int    `json:"fingerWithoutWorkflowCount"`
+	WorkflowWithoutFingerCount      int    `json:"workflowWithoutFingerCount"`
+	RecognitionWithoutWorkflowCount int    `json:"recognitionWithoutWorkflowCount"`
+	WorkflowWithoutRecognitionCount int    `json:"workflowWithoutRecognitionCount"`
+	Elapsed                         string `json:"elapsed"`
 }
 
 type RestoreExternalCapabilityBackupRequest struct {
 	ProjectRoot        string `json:"projectRoot"`
 	FingerBackupPath   string `json:"fingerBackupPath"`
+	DirBackupPath      string `json:"dirBackupPath"`
 	WorkflowBackupPath string `json:"workflowBackupPath"`
 	Confirm            bool   `json:"confirm"`
 	Confirmation       string `json:"confirmation"`
@@ -152,8 +189,10 @@ type RestoreExternalCapabilityBackupRequest struct {
 
 type RestoreExternalCapabilityBackupResult struct {
 	RestoredFinger            bool   `json:"restoredFinger"`
+	RestoredDir               bool   `json:"restoredDir"`
 	RestoredWorkflow          bool   `json:"restoredWorkflow"`
 	FingerCurrentBackupPath   string `json:"fingerCurrentBackupPath"`
+	DirCurrentBackupPath      string `json:"dirCurrentBackupPath"`
 	WorkflowCurrentBackupPath string `json:"workflowCurrentBackupPath"`
 	LogPath                   string `json:"logPath"`
 }
@@ -245,12 +284,42 @@ func (a *App) SaveExternalFingerprintReview(req SaveExternalFingerprintReviewReq
 	return &SavedReviewResult{Dir: dir, Kind: "finger", Count: len(req.Items), LogPath: logPath}, nil
 }
 
-func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir string) (*ExternalCapabilityScanResult, error) {
+func (a *App) SaveExternalDirReview(req SaveExternalDirReviewRequest) (*SavedReviewResult, error) {
+	if strings.TrimSpace(req.DirYaml) == "" {
+		return nil, fmt.Errorf("没有可保存的 dir.yaml")
+	}
+	dir, err := datedReviewDir("dir")
+	if err != nil {
+		return nil, err
+	}
+	yamlText := strings.TrimRight(req.DirYaml, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "dir.yaml"), []byte(yamlText), 0o644); err != nil {
+		return nil, err
+	}
+	review := storedDirReview{
+		Kind:        "dir",
+		CreatedAt:   time.Now().Format(time.RFC3339),
+		ProjectRoot: req.ProjectRoot,
+		SourceDir:   req.SourceDir,
+		Items:       req.Items,
+		DirYaml:     yamlText,
+		Removed:     req.Removed,
+	}
+	if err := writeJSON(filepath.Join(dir, "review.json"), review); err != nil {
+		return nil, err
+	}
+	logPath := filepath.Join(dir, "operation_log.jsonl")
+	appendReviewLog(logPath, "save_dir_review", map[string]any{"sourceDir": req.SourceDir, "products": len(req.Items), "removed": len(req.Removed)})
+	return &SavedReviewResult{Dir: dir, Kind: "dir", Count: len(req.Items), LogPath: logPath}, nil
+}
+
+func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir, dirReviewDir string) (*ExternalCapabilityScanResult, error) {
 	root := strings.TrimSpace(projectRoot)
 	if root == "" {
 		return nil, fmt.Errorf("dddd 根目录为空")
 	}
 	fingerPath := filepath.Join(root, "common", "config", "finger.yaml")
+	dirPath := filepath.Join(root, "common", "config", "dir.yaml")
 	pocDir := filepath.Join(root, "common", "config", "pocs")
 	ctx, pe, cleanup := a.beginTask("fingerprint:external_capability:progress", "scanning", 0)
 	defer cleanup()
@@ -258,6 +327,14 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 
 	pe.forceEmit(0, "读取 dddd finger.yaml")
 	existingFingers, err := loadFingerEntries(ctx, fingerPath)
+	if err != nil {
+		return nil, err
+	}
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("已取消")
+	}
+	pe.forceEmit(0, "读取 dddd dir.yaml")
+	existingDirs, err := loadDirEntries(ctx, dirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +353,9 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 		ProjectRoot:     root,
 		PocReviewDir:    strings.TrimSpace(pocReviewDir),
 		FingerReviewDir: strings.TrimSpace(fingerReviewDir),
+		DirReviewDir:    strings.TrimSpace(dirReviewDir),
 		NewFingers:      []fingerEntryView{},
+		NewDirs:         []dirEntryView{},
 		NewPocs:         []ExternalPocNewItem{},
 	}
 	if res.FingerReviewDir != "" {
@@ -296,6 +375,24 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 		}
 		res.NewFingerProducts = len(res.NewFingers)
 		res.NewFingerYaml = renderFingerEntriesYAML(diff)
+	}
+	if res.DirReviewDir != "" {
+		pe.forceEmit(0, "读取已审核接口路径")
+		imported, err := loadReviewedDirEntries(res.DirReviewDir)
+		if err != nil {
+			return nil, err
+		}
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("已取消")
+		}
+		pe.forceEmit(0, "对比新增接口路径")
+		diff := diffDirEntries(existingDirs, imported)
+		for _, entry := range diff {
+			res.NewDirs = append(res.NewDirs, dirEntryView{Product: entry.Product, Paths: entry.Paths})
+			res.NewDirPaths += len(entry.Paths)
+		}
+		res.NewDirProducts = len(res.NewDirs)
+		res.NewDirYaml = renderDirEntriesYAML(diff)
 	}
 	if res.PocReviewDir != "" {
 		pe.forceEmit(0, "读取已审核 POC")
@@ -342,9 +439,11 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 		res.LogPath = filepath.Join(res.PocReviewDir, "operation_log.jsonl")
 	} else if res.FingerReviewDir != "" {
 		res.LogPath = filepath.Join(res.FingerReviewDir, "operation_log.jsonl")
+	} else if res.DirReviewDir != "" {
+		res.LogPath = filepath.Join(res.DirReviewDir, "operation_log.jsonl")
 	}
 	if res.LogPath != "" {
-		appendReviewLog(res.LogPath, "scan_external_capability", map[string]any{"projectRoot": root, "newFingerProducts": res.NewFingerProducts, "newFingerRules": res.NewFingerRules, "newPocs": res.NewPocCount})
+		appendReviewLog(res.LogPath, "scan_external_capability", map[string]any{"projectRoot": root, "newFingerProducts": res.NewFingerProducts, "newFingerRules": res.NewFingerRules, "newDirProducts": res.NewDirProducts, "newDirPaths": res.NewDirPaths, "newPocs": res.NewPocCount})
 	}
 	return res, nil
 }
@@ -359,6 +458,7 @@ func (a *App) ApplyExternalCapability(req ApplyExternalCapabilityRequest) (*Appl
 	}
 	start := time.Now()
 	fingerPath := filepath.Join(root, "common", "config", "finger.yaml")
+	dirPath := filepath.Join(root, "common", "config", "dir.yaml")
 	workflowPath := filepath.Join(root, "common", "config", "workflow.yaml")
 	rawFinger, err := os.ReadFile(fingerPath)
 	if err != nil {
@@ -390,6 +490,37 @@ func (a *App) ApplyExternalCapability(req ApplyExternalCapabilityRequest) (*Appl
 		res.ProductsMerged = fingerResult.ProductsMerged
 		res.RulesAdded = fingerResult.RulesAdded
 		res.RulesSkipped = fingerResult.RulesSkipped
+	}
+	rawDir, err := os.ReadFile(dirPath)
+	if err != nil {
+		return nil, fmt.Errorf("读取 dir.yaml 失败: %v", err)
+	}
+	existingDirs, err := parseDirEntriesFromYAML(context.Background(), rawDir, "dir.yaml")
+	if err != nil {
+		return nil, err
+	}
+	importedDirs := []dirEntry{}
+	if strings.TrimSpace(req.NewDirYaml) != "" {
+		importedDirs, err = parseDirEntriesFromYAML(context.Background(), []byte(req.NewDirYaml), "新增 dir.yaml")
+		if err != nil {
+			return nil, err
+		}
+	}
+	mergedDirs, dirResult := mergeDirEntriesForApply(existingDirs, importedDirs)
+	if len(importedDirs) > 0 {
+		dirBackup := dirPath + "." + start.Format("20060102-150405") + ".bak"
+		if err := os.WriteFile(dirBackup, rawDir, 0o644); err != nil {
+			return nil, fmt.Errorf("备份 dir.yaml 失败: %v", err)
+		}
+		if err := os.WriteFile(dirPath, []byte(renderDirEntriesYAML(mergedDirs)), 0o644); err != nil {
+			return nil, fmt.Errorf("写回 dir.yaml 失败: %v", err)
+		}
+		res.DirBackupPath = dirBackup
+		res.DirProductsCreated = dirResult.ProductsCreated
+		res.DirProductsMerged = dirResult.ProductsMerged
+		res.DirPathsAdded = dirResult.RulesAdded
+		res.DirPathsSkipped = dirResult.RulesSkipped
+		res.ChangedProducts = uniqueSortedStrings(append(res.ChangedProducts, dirResult.ChangedProducts...))
 	}
 	if len(req.NewPocs) > 0 {
 		targetDir := filepath.Join(root, "common", "config", "pocs")
@@ -439,7 +570,7 @@ func (a *App) ApplyExternalCapability(req ApplyExternalCapabilityRequest) (*Appl
 		}
 	}
 	logPath := filepath.Join(root, "Doperationtool-merge-"+start.Format("20060102")+".jsonl")
-	appendReviewLog(logPath, "apply_external_capability", map[string]any{"productsCreated": res.ProductsCreated, "productsMerged": res.ProductsMerged, "rulesAdded": res.RulesAdded, "pocsCopied": res.PocsCopied, "workflowProducts": res.WorkflowProducts})
+	appendReviewLog(logPath, "apply_external_capability", map[string]any{"productsCreated": res.ProductsCreated, "productsMerged": res.ProductsMerged, "rulesAdded": res.RulesAdded, "dirProductsCreated": res.DirProductsCreated, "dirProductsMerged": res.DirProductsMerged, "dirPathsAdded": res.DirPathsAdded, "pocsCopied": res.PocsCopied, "workflowProducts": res.WorkflowProducts})
 	res.LogPath = logPath
 	if audit, auditErr := a.AuditFingerprintKnowledge(root); auditErr != nil {
 		res.PostAuditError = auditErr.Error()
@@ -460,6 +591,7 @@ func (a *App) RestoreExternalCapabilityBackup(req RestoreExternalCapabilityBacku
 	}
 	start := time.Now()
 	fingerPath := filepath.Join(root, "common", "config", "finger.yaml")
+	dirPath := filepath.Join(root, "common", "config", "dir.yaml")
 	workflowPath := filepath.Join(root, "common", "config", "workflow.yaml")
 	res := &RestoreExternalCapabilityBackupResult{}
 	if strings.TrimSpace(req.FingerBackupPath) != "" {
@@ -470,6 +602,14 @@ func (a *App) RestoreExternalCapabilityBackup(req RestoreExternalCapabilityBacku
 		res.RestoredFinger = true
 		res.FingerCurrentBackupPath = currentBackup
 	}
+	if strings.TrimSpace(req.DirBackupPath) != "" {
+		currentBackup, err := restoreConfigBackup(req.DirBackupPath, dirPath, start)
+		if err != nil {
+			return nil, err
+		}
+		res.RestoredDir = true
+		res.DirCurrentBackupPath = currentBackup
+	}
 	if strings.TrimSpace(req.WorkflowBackupPath) != "" {
 		currentBackup, err := restoreConfigBackup(req.WorkflowBackupPath, workflowPath, start)
 		if err != nil {
@@ -478,11 +618,11 @@ func (a *App) RestoreExternalCapabilityBackup(req RestoreExternalCapabilityBacku
 		res.RestoredWorkflow = true
 		res.WorkflowCurrentBackupPath = currentBackup
 	}
-	if !res.RestoredFinger && !res.RestoredWorkflow {
+	if !res.RestoredFinger && !res.RestoredDir && !res.RestoredWorkflow {
 		return nil, fmt.Errorf("没有可恢复的备份文件")
 	}
 	logPath := filepath.Join(root, "Doperationtool-merge-"+start.Format("20060102")+".jsonl")
-	appendReviewLog(logPath, "restore_external_capability_backup", map[string]any{"finger": res.RestoredFinger, "workflow": res.RestoredWorkflow, "fingerCurrentBackup": res.FingerCurrentBackupPath, "workflowCurrentBackup": res.WorkflowCurrentBackupPath})
+	appendReviewLog(logPath, "restore_external_capability_backup", map[string]any{"finger": res.RestoredFinger, "dir": res.RestoredDir, "workflow": res.RestoredWorkflow, "fingerCurrentBackup": res.FingerCurrentBackupPath, "dirCurrentBackup": res.DirCurrentBackupPath, "workflowCurrentBackup": res.WorkflowCurrentBackupPath})
 	res.LogPath = logPath
 	return res, nil
 }
@@ -575,20 +715,22 @@ func summarizeExternalCapabilityAudit(audit *FingerprintAuditResult) *ExternalCa
 		audit.PocWithoutFingerCount +
 		audit.FingerWithoutPocCount +
 		audit.WorkflowSuggestionCount +
-		audit.FingerWithoutWorkflowCount +
-		audit.WorkflowWithoutFingerCount
+		audit.RecognitionWithoutWorkflowCount +
+		audit.WorkflowWithoutRecognitionCount
 	return &ExternalCapabilityAuditSummary{
-		Passed:                     issueCount == 0,
-		IssueCount:                 issueCount,
-		MissingPocCount:            audit.MissingPocCount,
-		VirtualPocCount:            audit.VirtualPocCount,
-		IncompletePocCount:         audit.IncompletePocCount,
-		PocWithoutFingerCount:      audit.PocWithoutFingerCount,
-		FingerWithoutPocCount:      audit.FingerWithoutPocCount,
-		WorkflowSuggestionCount:    audit.WorkflowSuggestionCount,
-		FingerWithoutWorkflowCount: audit.FingerWithoutWorkflowCount,
-		WorkflowWithoutFingerCount: audit.WorkflowWithoutFingerCount,
-		Elapsed:                    audit.Elapsed,
+		Passed:                          issueCount == 0,
+		IssueCount:                      issueCount,
+		MissingPocCount:                 audit.MissingPocCount,
+		VirtualPocCount:                 audit.VirtualPocCount,
+		IncompletePocCount:              audit.IncompletePocCount,
+		PocWithoutFingerCount:           audit.PocWithoutFingerCount,
+		FingerWithoutPocCount:           audit.FingerWithoutPocCount,
+		WorkflowSuggestionCount:         audit.WorkflowSuggestionCount,
+		FingerWithoutWorkflowCount:      audit.FingerWithoutWorkflowCount,
+		WorkflowWithoutFingerCount:      audit.WorkflowWithoutFingerCount,
+		RecognitionWithoutWorkflowCount: audit.RecognitionWithoutWorkflowCount,
+		WorkflowWithoutRecognitionCount: audit.WorkflowWithoutRecognitionCount,
+		Elapsed:                         audit.Elapsed,
 	}
 }
 
@@ -706,6 +848,18 @@ func loadReviewedFingerEntries(dir string) ([]fingerEntry, error) {
 	return parseFingerEntriesFromYAML([]byte(review.DDDDYaml), filepath.Join(dir, "review.json"))
 }
 
+func loadReviewedDirEntries(dir string) ([]dirEntry, error) {
+	path := filepath.Join(dir, "dir.yaml")
+	if raw, err := os.ReadFile(path); err == nil {
+		return parseDirEntriesFromYAML(context.Background(), raw, path)
+	}
+	var review storedDirReview
+	if err := readJSON(filepath.Join(dir, "review.json"), &review); err != nil {
+		return nil, err
+	}
+	return parseDirEntriesFromYAML(context.Background(), []byte(review.DirYaml), filepath.Join(dir, "review.json"))
+}
+
 func loadReviewedPocs(dir string) (*storedPocReview, error) {
 	var review storedPocReview
 	if err := readJSON(filepath.Join(dir, "review.json"), &review); err != nil {
@@ -757,6 +911,49 @@ func diffFingerEntries(existing, imported []fingerEntry) []fingerEntry {
 		}
 		if len(rules) > 0 {
 			out = append(out, fingerEntry{Product: product, Rules: rules})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Product < out[j].Product })
+	return out
+}
+
+func diffDirEntries(existing, imported []dirEntry) []dirEntry {
+	existingByNorm := map[string]map[string]struct{}{}
+	productByNorm := map[string]string{}
+	for _, e := range existing {
+		norm := normalizeImportProductName(e.Product)
+		if norm == "" {
+			continue
+		}
+		if existingByNorm[norm] == nil {
+			existingByNorm[norm] = map[string]struct{}{}
+		}
+		if productByNorm[norm] == "" {
+			productByNorm[norm] = e.Product
+		}
+		for _, p := range normalizeDirPaths(e.Paths) {
+			existingByNorm[norm][p] = struct{}{}
+		}
+	}
+	out := []dirEntry{}
+	for _, entry := range imported {
+		norm := normalizeImportProductName(entry.Product)
+		if norm == "" {
+			continue
+		}
+		product := productByNorm[norm]
+		if product == "" {
+			product = entry.Product
+		}
+		paths := []string{}
+		for _, p := range normalizeDirPaths(entry.Paths) {
+			if _, ok := existingByNorm[norm][p]; ok {
+				continue
+			}
+			paths = append(paths, p)
+		}
+		if len(paths) > 0 {
+			out = append(out, dirEntry{Product: product, Paths: uniqueSortedStrings(paths)})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Product < out[j].Product })

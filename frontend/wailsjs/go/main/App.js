@@ -86,6 +86,10 @@ export function PreviewFingerprintImport(arg1, arg2) {
   return window['go']['main']['App']['PreviewFingerprintImport'](arg1, arg2);
 }
 
+export function PreviewDirImport(arg1, arg2) {
+  return window['go']['main']['App']['PreviewDirImport'](arg1, arg2);
+}
+
 export function RevealInFileManager(arg1) {
   return window['go']['main']['App']['RevealInFileManager'](arg1);
 }
@@ -96,6 +100,10 @@ export function RestoreExternalCapabilityBackup(arg1) {
 
 export function SaveExternalFingerprintReview(arg1) {
   return window['go']['main']['App']['SaveExternalFingerprintReview'](arg1);
+}
+
+export function SaveExternalDirReview(arg1) {
+  return window['go']['main']['App']['SaveExternalDirReview'](arg1);
 }
 
 export function SaveExternalPocReview(arg1) {
@@ -114,8 +122,8 @@ export function ScanDuplicateTemplates(arg1) {
   return window['go']['main']['App']['ScanDuplicateTemplates'](arg1);
 }
 
-export function ScanExternalCapability(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ScanExternalCapability'](arg1, arg2, arg3);
+export function ScanExternalCapability(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ScanExternalCapability'](arg1, arg2, arg3, arg4);
 }
 
 export function ScanTemplateCategories(arg1) {

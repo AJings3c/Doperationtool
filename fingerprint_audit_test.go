@@ -32,15 +32,27 @@ SharedTwo:
   pocs:
     - alpha-rce
     - missing-poc
+Delta:
+  type:
+    - root
+  pocs:
+    - delta-check
 Gamma:
   type:
     - root
   pocs:
     - gamma-panel
 `
+	dir := `Alpha:
+  - /alpha/login
+Delta:
+  - /delta/check
+`
 	writeTestFile(t, filepath.Join(cfgDir, "finger.yaml"), finger)
+	writeTestFile(t, filepath.Join(cfgDir, "dir.yaml"), dir)
 	writeTestFile(t, filepath.Join(cfgDir, "workflow.yaml"), workflow)
 	writeTestFile(t, filepath.Join(pocDir, "alpha-rce.yaml"), "id: alpha-rce\ninfo:\n  name: alpha\n")
+	writeTestFile(t, filepath.Join(pocDir, "delta-check.yaml"), "id: delta-check\ninfo:\n  name: delta\n")
 	writeTestFile(t, filepath.Join(pocDir, "beta.yaml"), "id: beta\ninfo:\n  name: beta\n")
 	writeTestFile(t, filepath.Join(pocDir, "gamma-panel.yml"), "id: gamma-panel\ninfo:\n  name: gamma\n")
 	writeTestFile(t, filepath.Join(pocDir, "orphan.yaml"), "id: orphan-id\ninfo:\n  name: orphan\n")
@@ -52,11 +64,14 @@ Gamma:
 	if res.FingerCount != 5 {
 		t.Fatalf("FingerCount = %d, want 5", res.FingerCount)
 	}
-	if res.WorkflowCount != 2 || res.WorkflowPocRefCount != 3 {
-		t.Fatalf("workflow stats = %d/%d, want 2/3", res.WorkflowCount, res.WorkflowPocRefCount)
+	if res.DirCount != 2 || res.DirPathCount != 2 || res.DirOnlyProductCount != 1 {
+		t.Fatalf("dir stats = count %d paths %d dirOnly %d, want 2/2/1", res.DirCount, res.DirPathCount, res.DirOnlyProductCount)
 	}
-	if res.PocFileCount != 4 || res.PocWithIDCount != 4 {
-		t.Fatalf("poc stats = %d/%d, want 3/3", res.PocFileCount, res.PocWithIDCount)
+	if res.WorkflowCount != 3 || res.WorkflowPocRefCount != 4 {
+		t.Fatalf("workflow stats = %d/%d, want 3/4", res.WorkflowCount, res.WorkflowPocRefCount)
+	}
+	if res.PocFileCount != 5 || res.PocWithIDCount != 5 {
+		t.Fatalf("poc stats = %d/%d, want 5/5", res.PocFileCount, res.PocWithIDCount)
 	}
 	if res.MissingPocCount != 1 || len(res.MissingPocs) != 1 || res.MissingPocs[0].Poc != "missing-poc" {
 		t.Fatalf("missing pocs = %#v, count=%d", res.MissingPocs, res.MissingPocCount)
@@ -76,7 +91,7 @@ Gamma:
 	if res.PocWithFingerNoWorkflowCount != 1 || len(res.PocWithFingerNoWorkflow) != 1 || res.PocWithFingerNoWorkflow[0].Product != "Beta" {
 		t.Fatalf("PocWithFingerNoWorkflow = %#v, count=%d", res.PocWithFingerNoWorkflow, res.PocWithFingerNoWorkflowCount)
 	}
-	if res.PocWithFingerCount != 2 || res.PocWithFingerWorkflowCount != 1 {
+	if res.PocWithFingerCount != 3 || res.PocWithFingerWorkflowCount != 2 {
 		t.Fatalf("poc with finger counts = %d/%d, pocs=%#v", res.PocWithFingerCount, res.PocWithFingerWorkflowCount, res.PocWithFinger)
 	}
 	if res.VirtualPocCount != 2 || len(res.VirtualPocs) != 2 {
@@ -85,8 +100,18 @@ Gamma:
 	if res.PocWithoutFingerCount != 2 || len(res.PocWithoutFinger) != 2 {
 		t.Fatalf("PocWithoutFinger = %#v, count=%d", res.PocWithoutFinger, res.PocWithoutFingerCount)
 	}
-	if res.IncompletePocCount != 4 || len(res.IncompletePocs) != 4 {
+	if res.IncompletePocCount != 5 || len(res.IncompletePocs) != 5 {
 		t.Fatalf("IncompletePocs = %#v, count=%d", res.IncompletePocs, res.IncompletePocCount)
+	}
+	foundDirOnlyWorkflow := false
+	for _, p := range res.PocWithFingerWorkflow {
+		if p.Product == "Delta" && p.Source == "dir" {
+			foundDirOnlyWorkflow = true
+			break
+		}
+	}
+	if !foundDirOnlyWorkflow {
+		t.Fatalf("expected dir-only Delta POC to be recognized and workflow-linked: %#v", res.PocWithFingerWorkflow)
 	}
 	if res.WeakRuleCount != 2 || len(res.WeakRules) != 2 {
 		t.Fatalf("WeakRuleCount = %d, weakRules=%#v, want 2", res.WeakRuleCount, res.WeakRules)
@@ -119,7 +144,8 @@ func TestClassifyDDDDBuiltinPocs(t *testing.T) {
 	if err := os.MkdirAll(pocDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeTestFile(t, filepath.Join(cfgDir, "finger.yaml"), "Alpha:\n  - 'title=\"Alpha\"'\nBeta:\n  - 'body=\"Beta\"'\n")
+	writeTestFile(t, filepath.Join(cfgDir, "finger.yaml"), "Alpha:\n  - 'title=\"Alpha\"'\n")
+	writeTestFile(t, filepath.Join(cfgDir, "dir.yaml"), "Beta:\n  - /beta/login\n")
 	writeTestFile(t, filepath.Join(cfgDir, "workflow.yaml"), "Alpha:\n  pocs:\n    - alpha-rce\n")
 	writeTestFile(t, filepath.Join(pocDir, "alpha-rce.yaml"), "id: alpha-rce\ninfo:\n  name: Alpha RCE\n  severity: high\nhttp:\n  - matchers:\n      - type: word\n        words: [Alpha]\n")
 	writeTestFile(t, filepath.Join(pocDir, "beta.yaml"), "id: beta\ninfo:\n  name: Beta Panel\n")
@@ -131,6 +157,9 @@ func TestClassifyDDDDBuiltinPocs(t *testing.T) {
 	}
 	if res.PocFileCount != 3 || len(res.AllPocs) != 3 {
 		t.Fatalf("all pocs = %d/%d", res.PocFileCount, len(res.AllPocs))
+	}
+	if res.DirCount != 1 || res.DirPathCount != 1 || res.RecognitionProductCount != 2 {
+		t.Fatalf("dir/recognition stats = %d/%d/%d", res.DirCount, res.DirPathCount, res.RecognitionProductCount)
 	}
 	if res.ClassifiedPocCount != 2 || res.UnmatchedPocCount != 1 || res.ComponentCount != 2 {
 		t.Fatalf("classified/unmatched/groups = %d/%d/%d groups=%#v", res.ClassifiedPocCount, res.UnmatchedPocCount, res.ComponentCount, res.Groups)

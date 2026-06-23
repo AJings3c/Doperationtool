@@ -30,9 +30,13 @@ func (a *App) ClassifyExternalPocsByDDDD(projectRoot, sourceDir string) (*Finger
 		return nil, fmt.Errorf("外部 POC 路径不是目录: %s", source)
 	}
 	fingerPath := filepath.Join(root, "common", "config", "finger.yaml")
+	dirPath := filepath.Join(root, "common", "config", "dir.yaml")
 	workflowPath := filepath.Join(root, "common", "config", "workflow.yaml")
 	if _, statErr := os.Stat(fingerPath); statErr != nil {
 		return nil, fmt.Errorf("缺少 dddd 指纹路径 %s: %v", fingerPath, statErr)
+	}
+	if _, statErr := os.Stat(dirPath); statErr != nil {
+		return nil, fmt.Errorf("缺少 dddd 接口路径 %s: %v", dirPath, statErr)
 	}
 
 	ctx, pe, cleanup := a.beginTask("fingerprint:external_poc_catalog:progress", "scanning", 0)
@@ -41,6 +45,11 @@ func (a *App) ClassifyExternalPocsByDDDD(projectRoot, sourceDir string) (*Finger
 
 	pe.forceEmit(0, "读取 dddd finger.yaml")
 	fingers, err := loadFingerEntries(ctx, fingerPath)
+	if err != nil {
+		return nil, err
+	}
+	pe.forceEmit(0, "读取 dddd dir.yaml")
+	dirs, err := loadDirEntries(ctx, dirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +75,8 @@ func (a *App) ClassifyExternalPocsByDDDD(projectRoot, sourceDir string) (*Finger
 	unique, duplicates := dedupeFingerprintPocs(pocs)
 	pocs = markDuplicateFingerprintPocs(pocs, duplicates)
 	pe.switchPhase("analyzing", len(pocs))
-	pe.forceEmit(0, fmt.Sprintf("按产品指纹归类 %d 个 POC，重复项保留标记", len(pocs)))
-	res, err := buildFingerprintPocCatalog(root, fingerPath, workflowPath, source, fingers, workflows, pocs, pe)
+	pe.forceEmit(0, fmt.Sprintf("按识别入口归类 %d 个 POC，重复项保留标记", len(pocs)))
+	res, err := buildFingerprintPocCatalog(root, fingerPath, dirPath, workflowPath, source, fingers, dirs, workflows, pocs, pe)
 	if err != nil {
 		return nil, err
 	}

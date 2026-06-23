@@ -5,9 +5,11 @@ import {
     buildExternalCapabilitySelection as buildExternalCapabilitySelectionState,
     createFingerprintReviewState,
     fingerprintReviewItemKey,
+    isExternalDirSelected as isExternalDirSelectedState,
     isExternalFingerSelected as isExternalFingerSelectedState,
     isExternalPocSelected as isExternalPocSelectedState,
     rebuildFingerprintReviewState,
+    renderExternalDirYaml,
     renderExternalFingerYaml,
     selectedExternalCapability as selectedExternalCapabilityState,
     selectedPocPlan as selectedPocPlanState,
@@ -53,9 +55,9 @@ import {
 import { WindowToggleMaximise, EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
 
 /* ============================================================
- * Doperationtool - 渗透测试辅助工具集
- *   · 辅助模块 / 文件名提取  (浏览器侧 ClipboardEvent.files)
- *   · 转换模块 / YAML 转换   (Wails 后端读写本地文件)
+ * Doperationtool - dddd 能力库本地运维工具
+ *   · dddd 运维 / 指纹审计、外部指纹导入、外部 POC 归类、能力接入
+ *   · 支撑工具 / YAML、Nuclei、POC 批处理
  * 单文件全部 UI 渲染 + 路由切换. 模块状态在切换间保留.
  * ============================================================ */
 
@@ -118,7 +120,7 @@ document.querySelector('#app').innerHTML = `
             <img class="sidebar-logo" id="sidebar-logo" src="${themeLogo()}" alt="Doperationtool" />
             <div class="sidebar-brand-text">
                 <div class="sidebar-title">Doperationtool</div>
-                <div class="sidebar-subtitle">v0.2 · Doperationtool</div>
+                <div class="sidebar-subtitle">v0.2 · dddd 运维台</div>
             </div>
         </div>
         <button class="sidebar-collapse" id="btn-sidebar-collapse" title="收起侧栏" aria-label="收起侧栏">‹</button>
@@ -3373,7 +3375,7 @@ function setupNucleiValidator() {
 
 
 // ============================================================
-// 模块: 模板去重 (辅助模块 / 模板去重)
+// 模块: 模板去重 (支撑工具 / 模板去重)
 // ============================================================
 //
 // 工作流: 选源目录 → 扫描 (后端按 id ∪ canonical 文件名 union-find 分组) → 看分组卡片
@@ -3799,7 +3801,7 @@ function setupTemplateDedup() {
 
 
 // ============================================================
-// 模块: 模板分类 (辅助模块 / 模板分类)
+// 模块: 模板分类 (支撑工具 / 模板分类)
 // ============================================================
 //
 // 工作流: 选源目录 → 扫描 (后端按 token 提取 + 前缀合并自动分组)
@@ -4278,7 +4280,7 @@ function setupTemplateClassify() {
 
 
 // ============================================================
-// 模块: YAML 采集 (辅助模块 / YAML 采集)
+// 模块: YAML 采集 (支撑工具 / YAML 采集)
 // ============================================================
 //
 // 跟"模板分类"区别:
@@ -4746,7 +4748,7 @@ function loadFingerGovState() {
         const raw = localStorage.getItem(FINGER_GOV_KEY);
         if (raw) return JSON.parse(raw);
     } catch (e) {}
-    return { root: '', history: [], importDir: '', importHistory: [], pocDir: '', pocHistory: [], pocReviewDir: '', pocReviewHistory: [], fingerReviewDir: '', fingerReviewHistory: [] };
+    return { root: '', history: [], importDir: '', importHistory: [], pocDir: '', pocHistory: [], pocReviewDir: '', pocReviewHistory: [], fingerReviewDir: '', fingerReviewHistory: [], dirReviewDir: '', dirReviewHistory: [] };
 }
 function saveFingerGovState(s) {
     try {
@@ -4761,6 +4763,8 @@ function saveFingerGovState(s) {
             pocReviewHistory: s.pocReviewHistory || [],
             fingerReviewDir: s.fingerReviewDir || '',
             fingerReviewHistory: s.fingerReviewHistory || [],
+            dirReviewDir: s.dirReviewDir || '',
+            dirReviewHistory: s.dirReviewHistory || [],
         }));
     } catch (e) {}
 }
@@ -5163,8 +5167,8 @@ function renderFingerprintGovernance(container) {
     container.innerHTML = `
     <div class="fingerprint-governance">
         <div class="extractor-tip">
-            🧬 这里检查 dddd 的指纹与 POC 能力: 对比 <code>common/config/finger.yaml</code>、
-            <code>workflow.yaml</code> 与 <code>common/config/pocs</code>，找出有指纹无 POC、有 POC 无指纹、虚空 POC、残缺 POC 和 workflow 不可调用问题。
+            🧬 这里检查 dddd 三文件识别链路: 对比 <code>common/config/finger.yaml</code>、
+            <code>common/config/dir.yaml</code>、<code>workflow.yaml</code> 与 <code>common/config/pocs</code>，找出识别入口无 workflow、workflow 无识别入口、虚空 POC、残缺 POC 和命名不一致问题。
         </div>
         <div class="fg-control-card">
             <div class="nv-toolbar">
@@ -5185,7 +5189,7 @@ function renderPocCatalog(container) {
     container.innerHTML = `
     <div class="fingerprint-governance poc-catalog">
         <div class="extractor-tip">
-            🧩 这里加载外部 POC 目录，先按 <code>id / 内容哈希 / 文件名</code> 去重，再按 dddd <code>finger.yaml</code> 的产品指纹归类，方便判断外部 POC 覆盖哪些 dddd 组件。
+            🧩 这里加载外部 POC 目录，先按 <code>id / 内容哈希 / 文件名</code> 去重，再按 dddd <code>finger.yaml ∪ dir.yaml</code> 的可识别产品归类，方便判断外部 POC 覆盖哪些 dddd 组件。
         </div>
         <div class="nv-toolbar">
             <input type="text" class="yaml-path-input" id="pc-root"
@@ -5198,7 +5202,7 @@ function renderPocCatalog(container) {
             <input type="text" class="yaml-path-input" id="pc-src"
                 placeholder="选择外部 POC 目录，支持递归扫描 yaml / yml" spellcheck="false" />
             <button class="btn" id="pc-src-pick">选择外部 POC</button>
-            <button class="btn btn-primary" id="pc-run">▶️ 去重并按 dddd 指纹归类</button>
+            <button class="btn btn-primary" id="pc-run">▶️ 去重并按 dddd 识别入口归类</button>
             <button class="btn" id="pc-save-review">保存审核结果</button>
         </div>
         <div class="nv-history" id="pc-src-history"></div>
@@ -5322,7 +5326,7 @@ function setupPocCatalog() {
         const oldLabel = elRun.textContent;
         elRun.textContent = '⏳ 归类中…';
         elSummary.innerHTML = '';
-        elResult.innerHTML = `<div class="yaml-empty">正在扫描 ${escapeHtml(sourceDir)}，并按 ${escapeHtml(root)} 的产品指纹归类…</div>`;
+        elResult.innerHTML = `<div class="yaml-empty">正在扫描 ${escapeHtml(sourceDir)}，并按 ${escapeHtml(root)} 的 dddd 识别入口归类…</div>`;
         progressTracker.start('fingerprint:external_poc_catalog:progress', '外部 POC 归类');
         try {
             const r = await ClassifyExternalPocsByDDDD(root, sourceDir);
@@ -5481,9 +5485,13 @@ function renderFingerprintAudit(r, elSummary, elResult) {
         </div>`;
     elSummary.innerHTML = `
         <div class="fg-stat-grid">
-            ${stat('指纹产品', r.fingerCount || 0)}
+            ${stat('finger 产品', r.fingerCount || 0)}
             ${stat('指纹规则', r.fingerRuleCount || 0)}
+            ${stat('dir 产品', r.dirCount || 0)}
+            ${stat('dir 路径', r.dirPathCount || 0)}
+            ${stat('可识别产品', r.recognitionProductCount || r.fingerCount || 0, 'fg-good')}
             ${stat('Workflow 产品', r.workflowCount || 0)}
+            ${stat('可验证产品', r.pocWithFingerWorkflowCount || 0, (r.pocWithFingerWorkflowCount || 0) ? 'fg-good' : '')}
             ${stat('Workflow POC 引用', r.workflowPocRefCount || 0)}
             ${stat('POC 文件', r.pocFileCount || 0)}
             ${stat('POC 带 ID', r.pocWithIdCount || 0)}
@@ -5493,10 +5501,10 @@ function renderFingerprintAudit(r, elSummary, elResult) {
             ${stat('POC 有指纹且可调用', r.pocWithFingerWorkflowCount || 0, (r.pocWithFingerWorkflowCount || 0) ? 'fg-good' : '')}
             ${stat('指纹无 POC', r.fingerWithoutPocCount || 0, (r.fingerWithoutPocCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('POC 有指纹未进 Workflow', r.pocWithFingerNoWorkflowCount || 0, (r.pocWithFingerNoWorkflowCount || 0) ? 'fg-warn' : 'fg-good')}
-            ${stat('POC 无指纹/无效', r.pocWithoutFingerCount || 0, (r.pocWithoutFingerCount || 0) ? 'fg-bad' : 'fg-good')}
+            ${stat('POC 无识别入口/无效', r.pocWithoutFingerCount || 0, (r.pocWithoutFingerCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('残缺 POC', r.incompletePocCount || 0, (r.incompletePocCount || 0) ? 'fg-bad' : 'fg-good')}
-            ${stat('指纹无 Workflow', r.fingerWithoutWorkflowCount || 0, (r.fingerWithoutWorkflowCount || 0) ? 'fg-warn' : 'fg-good')}
-            ${stat('Workflow 无指纹', r.workflowWithoutFingerCount || 0, (r.workflowWithoutFingerCount || 0) ? 'fg-bad' : 'fg-good')}
+            ${stat('识别入口无 Workflow', r.recognitionWithoutWorkflowCount || r.fingerWithoutWorkflowCount || 0, (r.recognitionWithoutWorkflowCount || r.fingerWithoutWorkflowCount || 0) ? 'fg-warn' : 'fg-good')}
+            ${stat('Workflow 无识别入口', r.workflowWithoutRecognitionCount || r.workflowWithoutFingerCount || 0, (r.workflowWithoutRecognitionCount || r.workflowWithoutFingerCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('弱规则', r.weakRuleCount || 0, (r.weakRuleCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('重复/共用规则', r.duplicateRuleGroupCount || 0, (r.duplicateRuleGroupCount || 0) ? 'fg-warn' : 'fg-good')}
             ${stat('Workflow 建议', r.workflowSuggestionCount || 0, (r.workflowSuggestionCount || 0) ? 'fg-good' : '')}
@@ -5505,6 +5513,7 @@ function renderFingerprintAudit(r, elSummary, elResult) {
         <div class="fg-paths">
             <div><b>dddd:</b> <code>${escapeHtml(r.projectRoot || '')}</code></div>
             <div><b>finger:</b> <code>${escapeHtml(r.fingerPath || '')}</code></div>
+            <div><b>dir:</b> <code>${escapeHtml(r.dirPath || '')}</code></div>
             <div><b>workflow:</b> <code>${escapeHtml(r.workflowPath || '')}</code></div>
             <div><b>pocs:</b> <code>${escapeHtml(r.pocDir || '')}</code></div>
         </div>`;
@@ -5525,8 +5534,10 @@ function renderFingerprintAudit(r, elSummary, elResult) {
 }
 
 function renderFingerprintFixGuide(r) {
-    const high = (r.fingerWithoutPocCount || 0) + (r.pocWithoutFingerCount || 0) + (r.workflowWithoutFingerCount || 0) + (r.weakRuleCount || 0);
-    const medium = (r.virtualPocCount || r.orphanPocCount || 0) + (r.pocWithFingerNoWorkflowCount || 0) + (r.fingerWithoutWorkflowCount || 0) + (r.duplicateRuleGroupCount || 0) + (r.assetOnlyProductCount || 0);
+    const workflowWithoutRecognition = r.workflowWithoutRecognitionCount || r.workflowWithoutFingerCount || 0;
+    const recognitionWithoutWorkflow = r.recognitionWithoutWorkflowCount || r.fingerWithoutWorkflowCount || 0;
+    const high = (r.fingerWithoutPocCount || 0) + (r.pocWithoutFingerCount || 0) + workflowWithoutRecognition + (r.weakRuleCount || 0);
+    const medium = (r.virtualPocCount || r.orphanPocCount || 0) + (r.pocWithFingerNoWorkflowCount || 0) + recognitionWithoutWorkflow + (r.duplicateRuleGroupCount || 0) + (r.assetOnlyProductCount || 0);
     const suggestion = r.workflowSuggestionCount || 0;
     return `
         <div class="fg-fix-guide">
@@ -5544,32 +5555,33 @@ function renderFingerprintFixGuide(r) {
 
 function renderFingerprintAuditIssueSections(r) {
     const fingerPath = r.fingerPath || '';
+    const dirPath = r.dirPath || '';
     const workflowPath = r.workflowPath || '';
     const pocDir = r.pocDir || '';
     const sections = [
-        renderFingerprintIssueTable('指纹无 POC：finger.yaml 有产品但没有可用 POC', r.fingerWithoutPocCount, (r.fingerWithoutPoc || []).map((product) => ({
+        renderFingerprintIssueTable('识别入口无 POC：finger.yaml / dir.yaml 有产品但没有可用 POC', r.fingerWithoutPocCount, (r.fingerWithoutPoc || []).map((product) => ({
             level: '高',
             object: product,
-            reason: '指纹产品没有任何已解析 workflow POC 覆盖',
+            reason: '可识别产品没有任何已解析 workflow POC 覆盖',
             target: 'common/config/workflow.yaml / common/config/pocs',
             fix: '为该产品补 workflow.pocs 并创建或关联对应 POC；若只是资产识别，转入误识别/资产类核对。',
             path: workflowPath || pocDir,
         }))),
-        renderFingerprintIssueTable('POC 无指纹/疑似无效：POC 无法匹配 finger.yaml 产品', r.pocWithoutFingerCount, (r.pocWithoutFinger || []).map((p) => ({
+        renderFingerprintIssueTable('POC 无识别入口/疑似无效：POC 无法匹配 finger.yaml / dir.yaml 产品', r.pocWithoutFingerCount, (r.pocWithoutFinger || []).map((p) => ({
             level: '高',
             object: p.relPath || p.name || p.id || '-',
-            reason: 'POC 的 id / info.name / 文件名无法匹配现有指纹产品',
-            target: 'common/config/finger.yaml / POC YAML',
-            fix: '补充对应产品指纹，或修正 POC 的 id、info.name、文件名，使其能匹配真实产品。',
+            reason: 'POC 的 id / info.name / 文件名无法匹配现有 finger 或 dir 产品',
+            target: 'common/config/finger.yaml / common/config/dir.yaml / POC YAML',
+            fix: '补充对应产品的 finger 指纹或 dir 路径，或修正 POC 的 id、info.name、文件名，使其能匹配真实产品。',
             path: p.path || fingerPath,
         }))),
-        renderFingerprintIssueTable('Workflow 无指纹：workflow.yaml 有产品但 finger.yaml 没有', r.workflowWithoutFingerCount, (r.workflowWithoutFinger || []).map((product) => ({
+        renderFingerprintIssueTable('Workflow 无识别入口：workflow.yaml 有产品但 finger.yaml / dir.yaml 都没有', r.workflowWithoutRecognitionCount || r.workflowWithoutFingerCount, (r.workflowWithoutRecognition || r.workflowWithoutFinger || []).map((product) => ({
             level: '高',
             object: product,
-            reason: 'workflow 产品无法匹配任何指纹产品',
-            target: 'common/config/finger.yaml / workflow.yaml',
-            fix: '为该产品补 finger.yaml 指纹规则，或统一 workflow 产品名与 finger.yaml 产品名。',
-            path: fingerPath || workflowPath,
+            reason: 'workflow 产品无法匹配任何识别入口产品',
+            target: 'common/config/finger.yaml / common/config/dir.yaml / workflow.yaml',
+            fix: '为该产品补 finger.yaml 指纹或 dir.yaml 路径，或统一 workflow 产品名与识别入口产品名。',
+            path: fingerPath || dirPath || workflowPath,
         }))),
         renderFingerprintIssueTable('弱规则：容易误报或泛匹配', r.weakRuleCount, (r.weakRules || []).map((x) => ({
             level: '高',
@@ -5603,10 +5615,10 @@ function renderFingerprintAuditIssueSections(r) {
             fix: '补齐 id、info.name、severity、requests 等关键字段，避免无法归类或无法调用。',
             path: p.path || pocDir,
         }))),
-        renderFingerprintIssueTable('指纹无 Workflow：有识别能力但没有调用配置', r.fingerWithoutWorkflowCount, (r.fingerWithoutWorkflow || []).map((product) => ({
+        renderFingerprintIssueTable('识别入口无 Workflow：有识别能力但没有调用配置', r.recognitionWithoutWorkflowCount || r.fingerWithoutWorkflowCount, (r.recognitionWithoutWorkflow || r.fingerWithoutWorkflow || []).map((product) => ({
             level: '中',
             object: product,
-            reason: 'finger.yaml 有产品，但 workflow.yaml 没有对应产品入口',
+            reason: 'finger.yaml 或 dir.yaml 有产品，但 workflow.yaml 没有对应产品入口',
             target: 'common/config/workflow.yaml',
             fix: '若需要漏洞验证，补 workflow 产品与 pocs；若仅资产识别，保留并在误识别/资产类中确认。',
             path: workflowPath,
@@ -5698,18 +5710,22 @@ function renderPocCatalogResult(r, elSummary, elResult) {
         </div>`;
     elSummary.innerHTML = `
         <div class="fg-stat-grid">
-            ${stat('指纹产品', r.fingerCount || 0)}
+            ${stat('finger 产品', r.fingerCount || 0)}
+            ${stat('dir 产品', r.dirCount || 0)}
+            ${stat('dir 路径', r.dirPathCount || 0)}
+            ${stat('可识别产品', r.recognitionProductCount || r.fingerCount || 0, 'fg-good')}
             ${stat('扫描 POC 文件', r.pocFileCount || 0)}
             ${stat('去重后 POC', r.uniquePocCount || r.pocFileCount || 0, 'fg-good')}
             ${stat('重复 POC', r.duplicatePocCount || 0, (r.duplicatePocCount || 0) ? 'fg-warn' : 'fg-good')}
-            ${stat('已按指纹归类', r.classifiedPocCount || 0, (r.classifiedPocCount || 0) ? 'fg-good' : '')}
+            ${stat('已按识别入口归类', r.classifiedPocCount || 0, (r.classifiedPocCount || 0) ? 'fg-good' : '')}
             ${stat('组件分组', r.componentCount || 0)}
-            ${stat('未匹配指纹 POC', r.unmatchedPocCount || 0, (r.unmatchedPocCount || 0) ? 'fg-bad' : 'fg-good')}
+            ${stat('未匹配识别入口 POC', r.unmatchedPocCount || 0, (r.unmatchedPocCount || 0) ? 'fg-bad' : 'fg-good')}
             ${stat('残缺 POC', r.incompletePocCount || 0, (r.incompletePocCount || 0) ? 'fg-bad' : 'fg-good')}
         </div>
         <div class="fg-paths">
             <div><b>dddd:</b> <code>${escapeHtml(r.projectRoot || '')}</code></div>
             <div><b>finger:</b> <code>${escapeHtml(r.fingerPath || '')}</code></div>
+            <div><b>dir:</b> <code>${escapeHtml(r.dirPath || '')}</code></div>
             <div><b>source:</b> <code>${escapeHtml(r.sourceDir || r.pocDir || '')}</code></div>
         </div>`;
     elResult.innerHTML = [
@@ -5717,7 +5733,7 @@ function renderPocCatalogResult(r, elSummary, elResult) {
         `<div class="fg-result-grid">
             ${renderFingerprintPocDetailTable('去重后外部 POC', r.uniquePocCount || (r.allPocs || []).length, r.allPocs)}
             ${renderPocDuplicateTable('重复 POC', r.duplicatePocCount, r.duplicatePocs)}
-            ${renderFingerprintPocDetailTable('未匹配 dddd 指纹的外部 POC', r.unmatchedPocCount, r.unmatchedPocs)}
+            ${renderFingerprintPocDetailTable('未匹配 dddd 识别入口的外部 POC', r.unmatchedPocCount, r.unmatchedPocs)}
             ${renderFingerprintPocDetailTable('残缺不完整外部 POC', r.incompletePocCount, r.incompletePocs)}
         </div>`,
     ].join('');
@@ -6040,7 +6056,7 @@ function renderExternalCapability(container) {
     container.innerHTML = `
     <div class="fingerprint-governance external-capability">
         <div class="extractor-tip">
-            🧩 扫描已审核的 <code>日期_poc</code> / <code>日期_finger</code>，只展示相对 dddd 新增的指纹规则和 POC；确认后再补充到 <code>finger.yaml</code>、<code>workflow.yaml</code> 与 <code>common/config/pocs</code>。
+            🧩 扫描已审核的 <code>日期_poc</code> / <code>日期_finger</code> / <code>日期_dir</code>，只展示相对 dddd 新增的识别入口和 POC；确认后再补充到 <code>finger.yaml</code>、<code>dir.yaml</code>、<code>workflow.yaml</code> 与 POC YAML。
         </div>
         <div class="fg-control-card">
             <div class="nv-toolbar">
@@ -6056,9 +6072,14 @@ function renderExternalCapability(container) {
             <div class="nv-toolbar">
                 <input type="text" class="yaml-path-input" id="ec-finger" placeholder="选择已保存的 日期_finger 目录，可为空" spellcheck="false" />
                 <button class="btn" id="ec-finger-pick">选择 日期_finger</button>
-                <button class="btn btn-primary" id="ec-scan">严格对比新增能力</button>
             </div>
             <div class="nv-history" id="ec-finger-history"></div>
+            <div class="nv-toolbar">
+                <input type="text" class="yaml-path-input" id="ec-dir" placeholder="选择已保存的 日期_dir 目录，可为空" spellcheck="false" />
+                <button class="btn" id="ec-dir-pick">选择 日期_dir</button>
+                <button class="btn btn-primary" id="ec-scan">严格对比新增能力</button>
+            </div>
+            <div class="nv-history" id="ec-dir-history"></div>
         </div>
         <div class="fg-summary" id="ec-summary"></div>
         <div class="fg-result" id="ec-result"></div>
@@ -6070,24 +6091,29 @@ function setupExternalCapability() {
     const elRoot = document.getElementById('ec-root');
     const elPoc = document.getElementById('ec-poc');
     const elFinger = document.getElementById('ec-finger');
+    const elDir = document.getElementById('ec-dir');
     const elRootPick = document.getElementById('ec-root-pick');
     const elPocPick = document.getElementById('ec-poc-pick');
     const elFingerPick = document.getElementById('ec-finger-pick');
+    const elDirPick = document.getElementById('ec-dir-pick');
     const elScan = document.getElementById('ec-scan');
     const elRootHist = document.getElementById('ec-root-history');
     const elPocHist = document.getElementById('ec-poc-history');
     const elFingerHist = document.getElementById('ec-finger-history');
+    const elDirHist = document.getElementById('ec-dir-history');
     const elSummary = document.getElementById('ec-summary');
     const elResult = document.getElementById('ec-result');
 
     elRoot.value = fingerGovState.root || '';
     elPoc.value = fingerGovState.pocReviewDir || '';
     elFinger.value = fingerGovState.fingerReviewDir || '';
+    elDir.value = fingerGovState.dirReviewDir || '';
 
     function renderHistories() {
         renderFingerHistoryChips(elRootHist, fingerGovState.history, (p) => { elRoot.value = p; fingerGovState.root = p; saveFingerGovState(fingerGovState); });
         renderFingerHistoryChips(elPocHist, fingerGovState.pocReviewHistory, (p) => { elPoc.value = p; fingerGovState.pocReviewDir = p; saveFingerGovState(fingerGovState); });
         renderFingerHistoryChips(elFingerHist, fingerGovState.fingerReviewHistory, (p) => { elFinger.value = p; fingerGovState.fingerReviewDir = p; saveFingerGovState(fingerGovState); });
+        renderFingerHistoryChips(elDirHist, fingerGovState.dirReviewHistory, (p) => { elDir.value = p; fingerGovState.dirReviewDir = p; saveFingerGovState(fingerGovState); });
     }
     renderHistories();
 
@@ -6105,9 +6131,11 @@ function setupExternalCapability() {
     elRootPick.addEventListener('click', () => pickTo(elRoot, 'history', 'root'));
     elPocPick.addEventListener('click', () => pickTo(elPoc, 'pocReviewHistory', 'pocReviewDir'));
     elFingerPick.addEventListener('click', () => pickTo(elFinger, 'fingerReviewHistory', 'fingerReviewDir'));
+    elDirPick.addEventListener('click', () => pickTo(elDir, 'dirReviewHistory', 'dirReviewDir'));
     elRoot.addEventListener('input', () => { fingerGovState.root = elRoot.value.trim(); saveFingerGovState(fingerGovState); });
     elPoc.addEventListener('input', () => { fingerGovState.pocReviewDir = elPoc.value.trim(); saveFingerGovState(fingerGovState); });
     elFinger.addEventListener('input', () => { fingerGovState.fingerReviewDir = elFinger.value.trim(); saveFingerGovState(fingerGovState); });
+    elDir.addEventListener('input', () => { fingerGovState.dirReviewDir = elDir.value.trim(); saveFingerGovState(fingerGovState); });
     elScan.addEventListener('click', () => runScan());
     elResult.addEventListener('click', async (e) => {
         const toggleBtn = e.target.closest && e.target.closest('.ec-toggle-all');
@@ -6151,29 +6179,31 @@ function setupExternalCapability() {
         const root = elRoot.value.trim();
         const pocDir = elPoc.value.trim();
         const fingerDir = elFinger.value.trim();
+        const dirDir = elDir.value.trim();
         if (!root) {
             toast('请先选择 dddd 根目录', 'error');
             return;
         }
-        if (!pocDir && !fingerDir) {
-            toast('至少选择一个 日期_poc 或 日期_finger 目录', 'error');
+        if (!pocDir && !fingerDir && !dirDir) {
+            toast('至少选择一个 日期_poc、日期_finger 或 日期_dir 目录', 'error');
             return;
         }
         elScan.disabled = true;
-        elResult.innerHTML = `<div class="yaml-empty">正在严格对比新增指纹和 POC…</div>`;
+        elResult.innerHTML = `<div class="yaml-empty">正在严格对比新增识别入口和 POC…</div>`;
         elSummary.innerHTML = '';
         progressTracker.start('fingerprint:external_capability:progress', '新增能力严格对比');
         clearExternalCapabilityRuntime();
         try {
-            const r = await ScanExternalCapability(root, pocDir, fingerDir);
+            const r = await ScanExternalCapability(root, pocDir, fingerDir, dirDir);
             lastCapabilityScan = r;
             lastCapabilitySelection = buildExternalCapabilitySelection(r);
             pushFingerHistory('history', 'root', root);
             if (pocDir) pushFingerHistory('pocReviewHistory', 'pocReviewDir', pocDir);
             if (fingerDir) pushFingerHistory('fingerReviewHistory', 'fingerReviewDir', fingerDir);
+            if (dirDir) pushFingerHistory('dirReviewHistory', 'dirReviewDir', dirDir);
             renderHistories();
             renderExternalCapabilityResult(r, elSummary, elResult);
-            toast(`对比完成: 新增指纹 ${r.newFingerProducts || 0} 产品 / ${r.newFingerRules || 0} 规则，新增 POC ${r.newPocCount || 0}`, 'success');
+            toast(`对比完成: 新增指纹 ${r.newFingerProducts || 0} 产品 / ${r.newFingerRules || 0} 规则，新增接口 ${r.newDirProducts || 0} 产品 / ${r.newDirPaths || 0} 路径，新增 POC ${r.newPocCount || 0}`, 'success');
         } catch (err) {
             elResult.innerHTML = `<div class="poc-validate-fail">❌ 对比失败: ${escapeHtml(err)}</div>`;
             toast(String(err), 'error');
@@ -6189,8 +6219,8 @@ function setupExternalCapability() {
             return;
         }
         const selected = selectedExternalCapability(lastCapabilityScan);
-        if (!selected.fingers.length && !selected.pocs.length) {
-            toast('请至少选择一项指纹规则或 POC 再写回', 'error');
+        if (!selected.fingers.length && !selected.dirs.length && !selected.pocs.length) {
+            toast('请至少选择一项指纹规则、接口路径或 POC 再写回', 'error');
             return;
         }
         const input = elResult.querySelector('#ec-confirm');
@@ -6205,15 +6235,17 @@ function setupExternalCapability() {
             const r = await ApplyExternalCapability({
                 projectRoot: elRoot.value.trim(),
                 newFingerYaml: renderExternalFingerYaml(selected.fingers),
+                newDirYaml: renderExternalDirYaml(selected.dirs),
                 newPocs: selected.pocs,
                 confirm: true,
                 confirmation,
             });
             lastCapabilityApplyResult = r;
-            toast(`✅ 接入完成: 指纹规则 +${r.rulesAdded || 0}，POC +${r.pocsCopied || 0}`, 'success');
+            toast(`✅ 接入完成: 指纹规则 +${r.rulesAdded || 0}，接口路径 +${r.dirPathsAdded || 0}，POC +${r.pocsCopied || 0}`, 'success');
             const status = elResult.querySelector('#ec-apply-status');
             if (status) status.innerHTML = `
                 <div class="fg-apply-ok">finger 备份: <code>${escapeHtml(r.fingerBackupPath || '未变更')}</code></div>
+                <div class="fg-apply-ok">dir 备份: <code>${escapeHtml(r.dirBackupPath || '未变更')}</code></div>
                 <div class="fg-apply-ok">workflow 备份: <code>${escapeHtml(r.workflowBackupPath || '未变更')}</code></div>
                 <div class="fg-apply-ok">POC 目录: <code>${escapeHtml(r.pocTargetDir || '未复制')}</code></div>
                 <div class="fg-apply-ok">日志: <code>${escapeHtml(r.logPath || '')}</code></div>
@@ -6228,7 +6260,7 @@ function setupExternalCapability() {
     }
 
     async function restoreCapabilityBackup() {
-        if (!lastCapabilityApplyResult || (!lastCapabilityApplyResult.fingerBackupPath && !lastCapabilityApplyResult.workflowBackupPath)) {
+        if (!lastCapabilityApplyResult || (!lastCapabilityApplyResult.fingerBackupPath && !lastCapabilityApplyResult.dirBackupPath && !lastCapabilityApplyResult.workflowBackupPath)) {
             toast('没有可恢复的本次接入备份', 'error');
             return;
         }
@@ -6244,14 +6276,16 @@ function setupExternalCapability() {
             const r = await RestoreExternalCapabilityBackup({
                 projectRoot: elRoot.value.trim(),
                 fingerBackupPath: lastCapabilityApplyResult.fingerBackupPath || '',
+                dirBackupPath: lastCapabilityApplyResult.dirBackupPath || '',
                 workflowBackupPath: lastCapabilityApplyResult.workflowBackupPath || '',
                 confirm: true,
                 confirmation,
             });
-            toast('已恢复本次接入前的 finger/workflow 备份', 'success');
+            toast('已恢复本次接入前的 finger/dir/workflow 备份', 'success');
             const status = elResult.querySelector('#ec-restore-status');
             if (status) status.innerHTML = `
                 <div class="fg-apply-ok">恢复 finger: ${r.restoredFinger ? '是' : '否'}，当前版本备份: <code>${escapeHtml(r.fingerCurrentBackupPath || '无')}</code></div>
+                <div class="fg-apply-ok">恢复 dir: ${r.restoredDir ? '是' : '否'}，当前版本备份: <code>${escapeHtml(r.dirCurrentBackupPath || '无')}</code></div>
                 <div class="fg-apply-ok">恢复 workflow: ${r.restoredWorkflow ? '是' : '否'}，当前版本备份: <code>${escapeHtml(r.workflowCurrentBackupPath || '无')}</code></div>
                 <div class="fg-apply-ok">日志: <code>${escapeHtml(r.logPath || '')}</code></div>`;
         } catch (err) {
@@ -6267,6 +6301,7 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
     if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(r);
     const selected = selectedExternalCapability(r);
     const selectedRuleCount = selected.fingers.reduce((n, x) => n + ((x.rules || []).length), 0);
+    const selectedDirPathCount = selected.dirs.reduce((n, x) => n + ((x.paths || []).length), 0);
     const stat = (label, value, tone = '') => `
         <div class="fg-stat ${tone}">
             <div class="fg-stat-value">${escapeHtml(value)}</div>
@@ -6276,19 +6311,28 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
         <div class="fg-stat-grid">
             ${stat('新增指纹产品', r.newFingerProducts || 0, (r.newFingerProducts || 0) ? 'fg-good' : '')}
             ${stat('新增指纹规则', r.newFingerRules || 0, (r.newFingerRules || 0) ? 'fg-good' : '')}
+            ${stat('新增接口产品', r.newDirProducts || 0, (r.newDirProducts || 0) ? 'fg-good' : '')}
+            ${stat('新增接口路径', r.newDirPaths || 0, (r.newDirPaths || 0) ? 'fg-good' : '')}
             ${stat('新增 POC', r.newPocCount || 0, (r.newPocCount || 0) ? 'fg-good' : '')}
-            ${stat('已选择', `${selected.fingers.length} 产品 / ${selected.pocs.length} POC`, (selected.fingers.length || selected.pocs.length) ? 'fg-good' : 'fg-bad')}
+            ${stat('已选择', `${selected.fingers.length} 指纹产品 / ${selected.dirs.length} 接口产品 / ${selected.pocs.length} POC`, (selected.fingers.length || selected.dirs.length || selected.pocs.length) ? 'fg-good' : 'fg-bad')}
         </div>
         <div class="fg-paths">
             <div><b>dddd:</b> <code>${escapeHtml(r.projectRoot || '')}</code></div>
             <div><b>poc:</b> <code>${escapeHtml(r.pocReviewDir || '')}</code></div>
             <div><b>finger:</b> <code>${escapeHtml(r.fingerReviewDir || '')}</code></div>
+            <div><b>dir:</b> <code>${escapeHtml(r.dirReviewDir || '')}</code></div>
         </div>`;
     const fingerRows = (r.newFingers || []).map((x) => `
         <tr>
             <td><input type="checkbox" class="ec-select-item" data-kind="finger" data-key="${escapeHtml(x.product || '')}" ${isExternalFingerSelected(x.product) ? 'checked' : ''} /></td>
             <td title="${escapeHtml(x.product || '')}">${escapeHtml(x.product || '')}</td>
             <td title="${escapeHtml((x.rules || []).join('\n'))}">${escapeHtml((x.rules || []).join('\n'))}</td>
+        </tr>`).join('');
+    const dirRows = (r.newDirs || []).map((x) => `
+        <tr>
+            <td><input type="checkbox" class="ec-select-item" data-kind="dir" data-key="${escapeHtml(x.product || '')}" ${isExternalDirSelected(x.product) ? 'checked' : ''} /></td>
+            <td title="${escapeHtml(x.product || '')}">${escapeHtml(x.product || '')}</td>
+            <td title="${escapeHtml((x.paths || []).join('\n'))}">${escapeHtml((x.paths || []).join('\n'))}</td>
         </tr>`).join('');
     const pocRows = (r.newPocs || []).map((x) => `
         <tr data-poc-path="${escapeHtml(x.path || '')}" data-poc-rel="${escapeHtml(x.relPath || x.name || '')}">
@@ -6304,15 +6348,18 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
             ${renderFingerprintSection('新增指纹规则', r.newFingerProducts || 0, fingerRows ? `
                 ${renderExternalCapabilitySelectionToolbar('finger')}
                 <div class="fg-table-wrap"><table class="fg-table"><thead><tr><th>选择</th><th>产品</th><th>新增规则</th></tr></thead><tbody>${fingerRows}</tbody></table></div>` : '', (r.newFingers || []).length)}
+            ${renderFingerprintSection('新增接口路径', r.newDirProducts || 0, dirRows ? `
+                ${renderExternalCapabilitySelectionToolbar('dir')}
+                <div class="fg-table-wrap"><table class="fg-table"><thead><tr><th>选择</th><th>产品</th><th>新增路径</th></tr></thead><tbody>${dirRows}</tbody></table></div>` : '', (r.newDirs || []).length)}
             ${renderFingerprintSection('新增 POC', r.newPocCount || 0, pocRows ? `
                 ${renderExternalCapabilitySelectionToolbar('poc')}
                 <div class="fg-table-wrap"><table class="fg-table fg-poc-finger-table"><thead><tr><th>选择</th><th>建议产品</th><th>POC</th><th>ID</th><th>置信</th><th>操作</th></tr></thead><tbody>${pocRows}</tbody></table></div>` : '', (r.newPocs || []).length)}
             ${renderExternalCapabilityPlanTable('写入前 POC 复制计划', selectedPocPlan(r))}
         </div>
-        <details class="fg-section fg-apply-section" ${(r.newFingerRules || r.newPocCount) ? 'open' : ''}>
-            <summary>确认接入 dddd <span>会备份 finger.yaml / workflow.yaml</span></summary>
+        <details class="fg-section fg-apply-section" ${(r.newFingerRules || r.newDirPaths || r.newPocCount) ? 'open' : ''}>
+            <summary>确认接入 dddd <span>会备份 finger.yaml / dir.yaml / workflow.yaml</span></summary>
             <div class="fg-apply-box">
-                <div class="fg-apply-selection">本次将写入 ${escapeHtml(selected.fingers.length)} 个指纹产品 / ${escapeHtml(selectedRuleCount)} 条规则，${escapeHtml(selected.pocs.length)} 个 POC。</div>
+                <div class="fg-apply-selection">本次将写入 ${escapeHtml(selected.fingers.length)} 个指纹产品 / ${escapeHtml(selectedRuleCount)} 条规则，${escapeHtml(selected.dirs.length)} 个接口产品 / ${escapeHtml(selectedDirPathCount)} 条路径，${escapeHtml(selected.pocs.length)} 个 POC。</div>
                 <input id="ec-confirm" class="yaml-path-input" placeholder="输入 APPLY_EXTERNAL_CAPABILITY 后才能写回" spellcheck="false" />
                 <button id="ec-apply" class="btn btn-primary">写入新增能力</button>
                 <div id="ec-apply-status"></div>
@@ -6345,6 +6392,10 @@ function buildExternalCapabilitySelection(r) {
 
 function isExternalFingerSelected(product) {
     return isExternalFingerSelectedState(lastCapabilitySelection, product);
+}
+
+function isExternalDirSelected(product) {
+    return isExternalDirSelectedState(lastCapabilitySelection, product);
 }
 
 function isExternalPocSelected(path) {
@@ -6390,12 +6441,12 @@ function renderExternalCapabilityPostAudit(audit, err) {
     return `
         <div class="fg-apply-audit ${tone}">
             <strong>${escapeHtml(label)}</strong>
-            <span>缺失 POC ${escapeHtml(audit.missingPocCount || 0)} · 虚空 POC ${escapeHtml(audit.virtualPocCount || 0)} · 残缺 POC ${escapeHtml(audit.incompletePocCount || 0)} · 无指纹 POC ${escapeHtml(audit.pocWithoutFingerCount || 0)} · 有指纹无 POC ${escapeHtml(audit.fingerWithoutPocCount || 0)}</span>
+            <span>缺失 POC ${escapeHtml(audit.missingPocCount || 0)} · 虚空 POC ${escapeHtml(audit.virtualPocCount || 0)} · 残缺 POC ${escapeHtml(audit.incompletePocCount || 0)} · 无识别入口 POC ${escapeHtml(audit.pocWithoutFingerCount || 0)} · 识别入口无 POC ${escapeHtml(audit.fingerWithoutPocCount || 0)} · 识别入口无 Workflow ${escapeHtml(audit.recognitionWithoutWorkflowCount || audit.fingerWithoutWorkflowCount || 0)} · Workflow 无识别入口 ${escapeHtml(audit.workflowWithoutRecognitionCount || audit.workflowWithoutFingerCount || 0)}</span>
         </div>`;
 }
 
 function renderExternalCapabilityRestoreBox(r) {
-    if (!r || (!r.fingerBackupPath && !r.workflowBackupPath)) return '';
+    if (!r || (!r.fingerBackupPath && !r.dirBackupPath && !r.workflowBackupPath)) return '';
     return `
         <div class="fg-restore-box">
             <div class="fg-restore-title">需要回滚本次接入时，可恢复写入前备份。</div>
@@ -6410,10 +6461,10 @@ function renderExternalCapabilityRestoreBox(r) {
 // ============================================================
 
 const routes = {
-    'fingerprint-governance': { module: '辅助模块', name: 'dddd 能力对比', render: renderFingerprintGovernance },
-    'poc-catalog':       { module: '辅助模块', name: '外部 POC 归类', render: renderPocCatalog      },
-    'dddd-fingerprint-converter': { module: '转换模块', name: '外部指纹导入', render: renderDDDDFingerprintConverter },
-    'external-capability': { module: '辅助模块', name: '能力接入', render: renderExternalCapability },
+    'fingerprint-governance': { module: 'dddd 运维', name: 'dddd 能力对比', render: renderFingerprintGovernance },
+    'poc-catalog':       { module: 'dddd 运维', name: '外部 POC 归类', render: renderPocCatalog      },
+    'dddd-fingerprint-converter': { module: 'dddd 运维', name: '外部指纹导入', render: renderDDDDFingerprintConverter },
+    'external-capability': { module: 'dddd 运维', name: '能力接入', render: renderExternalCapability },
 };
 
 const moduleByTool = {

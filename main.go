@@ -34,7 +34,7 @@ func main() {
 			TitleBar: mac.TitleBarHiddenInset(),
 			About: &mac.AboutInfo{
 				Title:   "Doperationtool",
-				Message: "Doperationtool v0.2\n渗透测试辅助工具集 (文件名提取 / YAML 转换)\n基于 Go + Wails",
+				Message: "Doperationtool v0.2\ndddd 能力库本地运维工具\n维护 finger.yaml、dir.yaml、workflow.yaml 三文件链路与外部能力接入流程\n基于 Go + Wails",
 			},
 		},
 	})
