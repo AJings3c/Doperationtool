@@ -138,6 +138,30 @@ export namespace main {
 	        this.duplicate = source["duplicate"];
 	    }
 	}
+	export class ExternalPocPlan {
+	    sourcePath: string;
+	    sourceRelPath: string;
+	    targetPath: string;
+	    targetName: string;
+	    product: string;
+	    id: string;
+	    conflictRenamed: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new ExternalPocPlan(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourcePath = source["sourcePath"];
+	        this.sourceRelPath = source["sourceRelPath"];
+	        this.targetPath = source["targetPath"];
+	        this.targetName = source["targetName"];
+	        this.product = source["product"];
+	        this.id = source["id"];
+	        this.conflictRenamed = source["conflictRenamed"];
+	    }
+	}
 	export class ApplyExternalCapabilityRequest {
 	    projectRoot: string;
 	    newFingerYaml: string;
@@ -176,6 +200,38 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ExternalCapabilityAuditSummary {
+	    passed: boolean;
+	    issueCount: number;
+	    missingPocCount: number;
+	    virtualPocCount: number;
+	    incompletePocCount: number;
+	    pocWithoutFingerCount: number;
+	    fingerWithoutPocCount: number;
+	    workflowSuggestionCount: number;
+	    fingerWithoutWorkflowCount: number;
+	    workflowWithoutFingerCount: number;
+	    elapsed: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ExternalCapabilityAuditSummary(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.passed = source["passed"];
+	        this.issueCount = source["issueCount"];
+	        this.missingPocCount = source["missingPocCount"];
+	        this.virtualPocCount = source["virtualPocCount"];
+	        this.incompletePocCount = source["incompletePocCount"];
+	        this.pocWithoutFingerCount = source["pocWithoutFingerCount"];
+	        this.fingerWithoutPocCount = source["fingerWithoutPocCount"];
+	        this.workflowSuggestionCount = source["workflowSuggestionCount"];
+	        this.fingerWithoutWorkflowCount = source["fingerWithoutWorkflowCount"];
+	        this.workflowWithoutFingerCount = source["workflowWithoutFingerCount"];
+	        this.elapsed = source["elapsed"];
+	    }
+	}
 	export class ApplyExternalCapabilityResult {
 	    fingerBackupPath: string;
 	    workflowBackupPath: string;
@@ -188,6 +244,9 @@ export namespace main {
 	    workflowProducts: number;
 	    logPath: string;
 	    changedProducts: string[];
+	    pocApplyPlan: ExternalPocPlan[];
+	    postAudit?: ExternalCapabilityAuditSummary;
+	    postAuditError?: string;
 
 	    static createFrom(source: any = {}) {
 	        return new ApplyExternalCapabilityResult(source);
@@ -206,7 +265,28 @@ export namespace main {
 	        this.workflowProducts = source["workflowProducts"];
 	        this.logPath = source["logPath"];
 	        this.changedProducts = source["changedProducts"];
+	        this.pocApplyPlan = this.convertValues(source["pocApplyPlan"], ExternalPocPlan);
+	        this.postAudit = this.convertValues(source["postAudit"], ExternalCapabilityAuditSummary);
+	        this.postAuditError = source["postAuditError"];
 	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 	export class AutoFixOptions {
@@ -755,6 +835,7 @@ export namespace main {
 	    newFingerYaml: string;
 	    newFingers: fingerEntryView[];
 	    newPocs: ExternalPocNewItem[];
+	    pocApplyPlan: ExternalPocPlan[];
 	    logPath: string;
 
 	    static createFrom(source: any = {}) {
@@ -772,6 +853,7 @@ export namespace main {
 	        this.newFingerYaml = source["newFingerYaml"];
 	        this.newFingers = this.convertValues(source["newFingers"], fingerEntryView);
 	        this.newPocs = this.convertValues(source["newPocs"], ExternalPocNewItem);
+	        this.pocApplyPlan = this.convertValues(source["pocApplyPlan"], ExternalPocPlan);
 	        this.logPath = source["logPath"];
 	    }
 
@@ -1847,4 +1929,3 @@ export namespace main {
 	}
 
 }
-

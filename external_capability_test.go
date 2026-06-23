@@ -57,6 +57,9 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	if scan.NewFingerProducts != 2 || scan.NewFingerRules != 2 || scan.NewPocCount != 1 {
 		t.Fatalf("scan stats = %#v", scan)
 	}
+	if len(scan.PocApplyPlan) != 1 || scan.PocApplyPlan[0].TargetName != "new-poc.yaml" || scan.PocApplyPlan[0].ConflictRenamed {
+		t.Fatalf("scan apply plan = %#v", scan.PocApplyPlan)
+	}
 
 	writeTestFile(t, filepath.Join(pocDir, "new-poc.yaml"), "id: collision-existing\ninfo:\n  name: Existing Same Filename\n  severity: low\n")
 
@@ -72,6 +75,12 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	}
 	if apply.PocTargetDir != pocDir || apply.PocsCopied != 1 || apply.WorkflowProducts != 1 {
 		t.Fatalf("apply result = %#v, want target %s", apply, pocDir)
+	}
+	if len(apply.PocApplyPlan) != 1 || apply.PocApplyPlan[0].TargetName != "new-poc-2.yaml" || !apply.PocApplyPlan[0].ConflictRenamed {
+		t.Fatalf("apply plan did not reflect final conflict-avoiding target: %#v", apply.PocApplyPlan)
+	}
+	if apply.PostAudit == nil {
+		t.Fatalf("expected post-apply audit summary")
 	}
 	if _, err := os.Stat(filepath.Join(pocDir, "new-poc-2.yaml")); err != nil {
 		t.Fatalf("expected copied poc in common/config/pocs without overwriting existing file: %v", err)

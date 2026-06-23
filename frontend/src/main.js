@@ -6098,7 +6098,9 @@ function setupExternalCapability() {
                 <div class="fg-apply-ok">finger 备份: <code>${escapeHtml(r.fingerBackupPath || '未变更')}</code></div>
                 <div class="fg-apply-ok">workflow 备份: <code>${escapeHtml(r.workflowBackupPath || '未变更')}</code></div>
                 <div class="fg-apply-ok">POC 目录: <code>${escapeHtml(r.pocTargetDir || '未复制')}</code></div>
-                <div class="fg-apply-ok">日志: <code>${escapeHtml(r.logPath || '')}</code></div>`;
+                <div class="fg-apply-ok">日志: <code>${escapeHtml(r.logPath || '')}</code></div>
+                ${renderExternalCapabilityPlanTable('实际 POC 写入结果', r.pocApplyPlan || [])}
+                ${renderExternalCapabilityPostAudit(r.postAudit, r.postAuditError)}`;
         } catch (err) {
             toast(`接入失败: ${err}`, 'error');
         } finally {
@@ -6143,6 +6145,7 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
                 <div class="fg-table-wrap"><table class="fg-table"><thead><tr><th>产品</th><th>新增规则</th></tr></thead><tbody>${fingerRows}</tbody></table></div>` : '', (r.newFingers || []).length)}
             ${renderFingerprintSection('新增 POC', r.newPocCount || 0, pocRows ? `
                 <div class="fg-table-wrap"><table class="fg-table fg-poc-finger-table"><thead><tr><th>建议产品</th><th>POC</th><th>ID</th><th>置信</th><th>操作</th></tr></thead><tbody>${pocRows}</tbody></table></div>` : '', (r.newPocs || []).length)}
+            ${renderExternalCapabilityPlanTable('写入前 POC 复制计划', r.pocApplyPlan || [])}
         </div>
         <details class="fg-section fg-apply-section" ${(r.newFingerRules || r.newPocCount) ? 'open' : ''}>
             <summary>确认接入 dddd <span>会备份 finger.yaml / workflow.yaml</span></summary>
@@ -6152,6 +6155,39 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
                 <div id="ec-apply-status"></div>
             </div>
         </details>`;
+}
+
+function renderExternalCapabilityPlanTable(title, plans) {
+    const list = plans || [];
+    if (!list.length) return '';
+    const rows = list.map((x) => `
+        <tr>
+            <td title="${escapeHtml(x.product || '')}">${escapeHtml(x.product || '-')}</td>
+            <td title="${escapeHtml(x.sourceRelPath || x.sourcePath || '')}">${escapeHtml(x.sourceRelPath || x.sourcePath || '-')}</td>
+            <td title="${escapeHtml(x.targetPath || '')}">${escapeHtml(x.targetName || x.targetPath || '-')}</td>
+            <td>${x.conflictRenamed ? '<span class="fg-dup-mark">已避让同名</span>' : '-'}</td>
+        </tr>`).join('');
+    return renderFingerprintSection(title, list.length, `
+        <div class="fg-table-wrap">
+            <table class="fg-table fg-poc-finger-table">
+                <thead><tr><th>产品</th><th>来源</th><th>目标文件</th><th>冲突</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`, list.length);
+}
+
+function renderExternalCapabilityPostAudit(audit, err) {
+    if (err) {
+        return `<div class="fg-apply-audit fg-apply-audit-bad">写入后审计失败: ${escapeHtml(err)}</div>`;
+    }
+    if (!audit) return '';
+    const tone = audit.passed ? 'fg-apply-audit-ok' : 'fg-apply-audit-bad';
+    const label = audit.passed ? '写入后审计通过' : `写入后审计发现 ${audit.issueCount || 0} 个问题`;
+    return `
+        <div class="fg-apply-audit ${tone}">
+            <strong>${escapeHtml(label)}</strong>
+            <span>缺失 POC ${escapeHtml(audit.missingPocCount || 0)} · 虚空 POC ${escapeHtml(audit.virtualPocCount || 0)} · 残缺 POC ${escapeHtml(audit.incompletePocCount || 0)} · 无指纹 POC ${escapeHtml(audit.pocWithoutFingerCount || 0)} · 有指纹无 POC ${escapeHtml(audit.fingerWithoutPocCount || 0)}</span>
+        </div>`;
 }
 
 // ============================================================

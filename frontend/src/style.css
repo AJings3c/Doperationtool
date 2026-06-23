@@ -2551,6 +2551,28 @@ a {
     color: #3fb950;
     margin-top: 4px;
 }
+.fg-apply-audit {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-top: 8px;
+    display: grid;
+    gap: 4px;
+}
+.fg-apply-audit strong {
+    color: var(--text-1);
+}
+.fg-apply-audit span {
+    color: var(--text-2);
+}
+.fg-apply-audit-ok {
+    border-color: rgba(63, 185, 80, 0.45);
+    background: rgba(63, 185, 80, 0.08);
+}
+.fg-apply-audit-bad {
+    border-color: rgba(248, 81, 73, 0.45);
+    background: rgba(248, 81, 73, 0.08);
+}
 .poc-dddd-card {
     border: 1px solid var(--border);
     border-radius: 6px;

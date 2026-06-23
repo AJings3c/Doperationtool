@@ -72,6 +72,7 @@ type ExternalCapabilityScanResult struct {
 	NewFingerYaml     string               `json:"newFingerYaml"`
 	NewFingers        []fingerEntryView    `json:"newFingers"`
 	NewPocs           []ExternalPocNewItem `json:"newPocs"`
+	PocApplyPlan      []ExternalPocPlan    `json:"pocApplyPlan"`
 	LogPath           string               `json:"logPath"`
 }
 
@@ -92,6 +93,16 @@ type ExternalPocNewItem struct {
 	Duplicate       bool   `json:"duplicate"`
 }
 
+type ExternalPocPlan struct {
+	SourcePath      string `json:"sourcePath"`
+	SourceRelPath   string `json:"sourceRelPath"`
+	TargetPath      string `json:"targetPath"`
+	TargetName      string `json:"targetName"`
+	Product         string `json:"product"`
+	ID              string `json:"id"`
+	ConflictRenamed bool   `json:"conflictRenamed"`
+}
+
 type ApplyExternalCapabilityRequest struct {
 	ProjectRoot   string               `json:"projectRoot"`
 	NewFingerYaml string               `json:"newFingerYaml"`
@@ -101,17 +112,34 @@ type ApplyExternalCapabilityRequest struct {
 }
 
 type ApplyExternalCapabilityResult struct {
-	FingerBackupPath   string   `json:"fingerBackupPath"`
-	WorkflowBackupPath string   `json:"workflowBackupPath"`
-	PocTargetDir       string   `json:"pocTargetDir"`
-	ProductsCreated    int      `json:"productsCreated"`
-	ProductsMerged     int      `json:"productsMerged"`
-	RulesAdded         int      `json:"rulesAdded"`
-	RulesSkipped       int      `json:"rulesSkipped"`
-	PocsCopied         int      `json:"pocsCopied"`
-	WorkflowProducts   int      `json:"workflowProducts"`
-	LogPath            string   `json:"logPath"`
-	ChangedProducts    []string `json:"changedProducts"`
+	FingerBackupPath   string                          `json:"fingerBackupPath"`
+	WorkflowBackupPath string                          `json:"workflowBackupPath"`
+	PocTargetDir       string                          `json:"pocTargetDir"`
+	ProductsCreated    int                             `json:"productsCreated"`
+	ProductsMerged     int                             `json:"productsMerged"`
+	RulesAdded         int                             `json:"rulesAdded"`
+	RulesSkipped       int                             `json:"rulesSkipped"`
+	PocsCopied         int                             `json:"pocsCopied"`
+	WorkflowProducts   int                             `json:"workflowProducts"`
+	LogPath            string                          `json:"logPath"`
+	ChangedProducts    []string                        `json:"changedProducts"`
+	PocApplyPlan       []ExternalPocPlan               `json:"pocApplyPlan"`
+	PostAudit          *ExternalCapabilityAuditSummary `json:"postAudit,omitempty"`
+	PostAuditError     string                          `json:"postAuditError,omitempty"`
+}
+
+type ExternalCapabilityAuditSummary struct {
+	Passed                     bool   `json:"passed"`
+	IssueCount                 int    `json:"issueCount"`
+	MissingPocCount            int    `json:"missingPocCount"`
+	VirtualPocCount            int    `json:"virtualPocCount"`
+	IncompletePocCount         int    `json:"incompletePocCount"`
+	PocWithoutFingerCount      int    `json:"pocWithoutFingerCount"`
+	FingerWithoutPocCount      int    `json:"fingerWithoutPocCount"`
+	WorkflowSuggestionCount    int    `json:"workflowSuggestionCount"`
+	FingerWithoutWorkflowCount int    `json:"fingerWithoutWorkflowCount"`
+	WorkflowWithoutFingerCount int    `json:"workflowWithoutFingerCount"`
+	Elapsed                    string `json:"elapsed"`
 }
 
 func (a *App) SaveExternalPocReview(req SaveExternalPocReviewRequest) (*SavedReviewResult, error) {
@@ -263,6 +291,7 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 		}
 		sort.Slice(res.NewPocs, func(i, j int) bool { return res.NewPocs[i].RelPath < res.NewPocs[j].RelPath })
 		res.NewPocCount = len(res.NewPocs)
+		res.PocApplyPlan = planExternalPocCopies(root, res.NewPocs)
 	}
 	if res.PocReviewDir != "" {
 		res.LogPath = filepath.Join(res.PocReviewDir, "operation_log.jsonl")
@@ -322,28 +351,19 @@ func (a *App) ApplyExternalCapability(req ApplyExternalCapabilityRequest) (*Appl
 		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			return nil, err
 		}
-		used := map[string]int{}
+		plan := planExternalPocCopies(root, req.NewPocs)
+		res.PocApplyPlan = plan
 		copiedNamesByProduct := map[string][]string{}
-		for _, p := range req.NewPocs {
-			name := safePathName(filepath.Base(p.Path))
-			if strings.TrimSpace(p.ID) != "" {
-				name = safePathName(p.ID)
-				if filepath.Ext(name) == "" {
-					name += ".yaml"
-				}
+		for i, p := range req.NewPocs {
+			if i >= len(plan) {
+				break
 			}
-			if name == "" || name == "." {
-				name = "poc.yaml"
-			}
-			dst := uniqueAvailableTargetPath(targetDir, name, used)
+			dst := plan[i].TargetPath
 			if err := copyFile(p.Path, dst); err != nil {
 				return nil, fmt.Errorf("复制 POC 失败 %s: %v", p.Path, err)
 			}
 			pocName := strings.TrimSuffix(filepath.Base(dst), filepath.Ext(dst))
-			product := p.MatchedProduct
-			if product == "" {
-				product = productNameFromFilename(pocName)
-			}
+			product := plan[i].Product
 			if product != "" {
 				copiedNamesByProduct[product] = append(copiedNamesByProduct[product], pocName)
 			}
@@ -376,7 +396,78 @@ func (a *App) ApplyExternalCapability(req ApplyExternalCapabilityRequest) (*Appl
 	logPath := filepath.Join(root, "Doperationtool-merge-"+start.Format("20060102")+".jsonl")
 	appendReviewLog(logPath, "apply_external_capability", map[string]any{"productsCreated": res.ProductsCreated, "productsMerged": res.ProductsMerged, "rulesAdded": res.RulesAdded, "pocsCopied": res.PocsCopied, "workflowProducts": res.WorkflowProducts})
 	res.LogPath = logPath
+	if audit, auditErr := a.AuditFingerprintKnowledge(root); auditErr != nil {
+		res.PostAuditError = auditErr.Error()
+	} else {
+		res.PostAudit = summarizeExternalCapabilityAudit(audit)
+		appendReviewLog(logPath, "post_apply_audit", map[string]any{"passed": res.PostAudit.Passed, "issues": res.PostAudit.IssueCount, "missingPocs": res.PostAudit.MissingPocCount, "virtualPocs": res.PostAudit.VirtualPocCount, "incompletePocs": res.PostAudit.IncompletePocCount})
+	}
 	return res, nil
+}
+
+func planExternalPocCopies(root string, pocs []ExternalPocNewItem) []ExternalPocPlan {
+	targetDir := filepath.Join(root, "common", "config", "pocs")
+	used := map[string]int{}
+	plans := make([]ExternalPocPlan, 0, len(pocs))
+	for _, p := range pocs {
+		name := safeExternalPocTargetName(p)
+		target := uniqueAvailableTargetPath(targetDir, name, used)
+		product := p.MatchedProduct
+		if product == "" {
+			product = productNameFromFilename(strings.TrimSuffix(filepath.Base(target), filepath.Ext(target)))
+		}
+		plans = append(plans, ExternalPocPlan{
+			SourcePath:      p.Path,
+			SourceRelPath:   p.RelPath,
+			TargetPath:      target,
+			TargetName:      filepath.Base(target),
+			Product:         product,
+			ID:              p.ID,
+			ConflictRenamed: filepath.Base(target) != name,
+		})
+	}
+	return plans
+}
+
+func safeExternalPocTargetName(p ExternalPocNewItem) string {
+	name := safePathName(filepath.Base(p.Path))
+	if strings.TrimSpace(p.ID) != "" {
+		name = safePathName(p.ID)
+		if filepath.Ext(name) == "" {
+			name += ".yaml"
+		}
+	}
+	if name == "" || name == "." {
+		name = "poc.yaml"
+	}
+	return name
+}
+
+func summarizeExternalCapabilityAudit(audit *FingerprintAuditResult) *ExternalCapabilityAuditSummary {
+	if audit == nil {
+		return nil
+	}
+	issueCount := audit.MissingPocCount +
+		audit.VirtualPocCount +
+		audit.IncompletePocCount +
+		audit.PocWithoutFingerCount +
+		audit.FingerWithoutPocCount +
+		audit.WorkflowSuggestionCount +
+		audit.FingerWithoutWorkflowCount +
+		audit.WorkflowWithoutFingerCount
+	return &ExternalCapabilityAuditSummary{
+		Passed:                     issueCount == 0,
+		IssueCount:                 issueCount,
+		MissingPocCount:            audit.MissingPocCount,
+		VirtualPocCount:            audit.VirtualPocCount,
+		IncompletePocCount:         audit.IncompletePocCount,
+		PocWithoutFingerCount:      audit.PocWithoutFingerCount,
+		FingerWithoutPocCount:      audit.FingerWithoutPocCount,
+		WorkflowSuggestionCount:    audit.WorkflowSuggestionCount,
+		FingerWithoutWorkflowCount: audit.FingerWithoutWorkflowCount,
+		WorkflowWithoutFingerCount: audit.WorkflowWithoutFingerCount,
+		Elapsed:                    audit.Elapsed,
+	}
 }
 
 func datedReviewDir(kind string) (string, error) {
