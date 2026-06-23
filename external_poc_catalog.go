@@ -64,9 +64,10 @@ func (a *App) ClassifyExternalPocsByDDDD(projectRoot, sourceDir string) (*Finger
 	pe.switchPhase("deduping", len(pocs))
 	pe.forceEmit(0, fmt.Sprintf("外部 POC 去重: %d 个文件", len(pocs)))
 	unique, duplicates := dedupeFingerprintPocs(pocs)
-	pe.switchPhase("analyzing", len(unique))
-	pe.forceEmit(0, fmt.Sprintf("按产品指纹归类 %d 个唯一 POC", len(unique)))
-	res, err := buildFingerprintPocCatalog(root, fingerPath, workflowPath, source, fingers, workflows, unique, pe)
+	pocs = markDuplicateFingerprintPocs(pocs, duplicates)
+	pe.switchPhase("analyzing", len(pocs))
+	pe.forceEmit(0, fmt.Sprintf("按产品指纹归类 %d 个 POC，重复项保留标记", len(pocs)))
+	res, err := buildFingerprintPocCatalog(root, fingerPath, workflowPath, source, fingers, workflows, pocs, pe)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +79,25 @@ func (a *App) ClassifyExternalPocsByDDDD(projectRoot, sourceDir string) (*Finger
 	res.DuplicatePocs = duplicates
 	res.Elapsed = time.Since(start).Truncate(10 * time.Millisecond).String()
 	return res, nil
+}
+
+func markDuplicateFingerprintPocs(pocs []FingerprintPocInfo, duplicates []FingerprintPocDuplicate) []FingerprintPocInfo {
+	dupByPath := map[string]FingerprintPocDuplicate{}
+	for _, d := range duplicates {
+		dupByPath[d.DuplicatePath] = d
+	}
+	out := make([]FingerprintPocInfo, 0, len(pocs))
+	for _, p := range pocs {
+		if d, ok := dupByPath[p.Path]; ok {
+			p.Duplicate = true
+			p.DuplicateKey = d.Key
+			p.DuplicateReason = d.Reason
+			p.DuplicateOf = d.KeptRelPath
+		}
+		out = append(out, p)
+	}
+	sortFingerprintPocInfos(out)
+	return out
 }
 
 func dedupeFingerprintPocs(pocs []FingerprintPocInfo) ([]FingerprintPocInfo, []FingerprintPocDuplicate) {

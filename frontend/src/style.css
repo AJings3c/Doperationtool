@@ -2231,7 +2231,7 @@ a {
 }
 .fg-issue-table th:nth-child(2),
 .fg-issue-table td:nth-child(2) {
-    width: 210px;
+    width: 250px;
 }
 .fg-issue-table th:nth-child(3),
 .fg-issue-table td:nth-child(3) {
@@ -2254,6 +2254,38 @@ a {
     white-space: normal;
     word-break: break-word;
     line-height: 1.45;
+}
+.fg-copy-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.fg-copy-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: text;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.fg-copy-object {
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 6px;
+}
+.fg-copy-object:hover {
+    color: var(--text-1);
+    border-color: var(--accent, #58a6ff);
+    background: var(--bg-3);
 }
 .fg-poc-table th:nth-child(1),
 .fg-poc-table td:nth-child(1) {
@@ -2388,6 +2420,19 @@ a {
     color: var(--text-1);
     border-color: var(--accent, #58a6ff);
     background: var(--bg-3);
+}
+.fg-dup-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(210, 153, 34, 0.45);
+    color: #d29922;
+    background: rgba(210, 153, 34, 0.08);
+    font-size: 11px;
+    font-family: var(--font-sans);
 }
 .fg-import-card {
     border: 1px solid var(--border);

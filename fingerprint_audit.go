@@ -91,6 +91,10 @@ type FingerprintPocInfo struct {
 	Incomplete           bool     `json:"incomplete"`
 	Issues               []string `json:"issues"`
 	ContentHash          string   `json:"contentHash,omitempty"`
+	Duplicate            bool     `json:"duplicate,omitempty"`
+	DuplicateKey         string   `json:"duplicateKey,omitempty"`
+	DuplicateReason      string   `json:"duplicateReason,omitempty"`
+	DuplicateOf          string   `json:"duplicateOf,omitempty"`
 }
 
 type FingerprintPocFingerMatch struct {
@@ -470,7 +474,9 @@ func scanFingerprintPocs(ctx context.Context, pe *progressEmitter, dir string) (
 		}
 		issues := fingerprintPocIncompleteIssues(meta)
 		pocs = append(pocs, FingerprintPocInfo{Path: path, RelPath: rel, Name: name, ID: meta.ID, InfoName: meta.InfoName, Severity: meta.Severity, Tags: meta.Tags, Incomplete: len(issues) > 0, Issues: issues, ContentHash: contentHash})
-		pe.tick(len(pocs), fmt.Sprintf("已扫描 %d 个 POC", len(pocs)))
+		if pe != nil {
+			pe.tick(len(pocs), fmt.Sprintf("已扫描 %d 个 POC", len(pocs)))
+		}
 		return nil
 	})
 	if ctx.Err() != nil {

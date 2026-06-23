@@ -5,6 +5,7 @@ import {
     ApplyTemplateCategories,
     ApplyYamlCollection,
     ApplyFingerprintImport,
+    ApplyExternalCapability,
     AutoFixNucleiTemplates,
     AuditFingerprintKnowledge,
     CancelCurrentTask,
@@ -22,8 +23,11 @@ import {
     OpenWithDefaultApp,
     PreviewFingerprintImport,
     RevealInFileManager,
+    SaveExternalFingerprintReview,
+    SaveExternalPocReview,
     SaveSourceFile,
     SaveYamlBatch,
+    ScanExternalCapability,
     ScanDuplicateTemplates,
     ScanTemplateCategories,
     ScanYamlCollection,
@@ -109,6 +113,7 @@ document.querySelector('#app').innerHTML = `
         <li class="module-item" data-tool="fingerprint-governance"><span class="module-icon">A</span><span class="module-label">dddd 能力对比</span></li>
         <li class="module-item" data-tool="poc-catalog"><span class="module-icon">P</span><span class="module-label">外部 POC 归类</span></li>
         <li class="module-item" data-tool="dddd-fingerprint-converter"><span class="module-icon">F</span><span class="module-label">外部指纹导入</span></li>
+        <li class="module-item" data-tool="external-capability"><span class="module-icon">I</span><span class="module-label">能力接入</span></li>
     </ul>
     <div class="sidebar-footer">© 2026 Doperationtool</div>
     <div class="sidebar-resizer" id="sidebar-resizer" title="拖动调整宽度"></div>
@@ -4727,7 +4732,7 @@ function loadFingerGovState() {
         const raw = localStorage.getItem(FINGER_GOV_KEY);
         if (raw) return JSON.parse(raw);
     } catch (e) {}
-    return { root: '', history: [], importDir: '', importHistory: [], pocDir: '', pocHistory: [] };
+    return { root: '', history: [], importDir: '', importHistory: [], pocDir: '', pocHistory: [], pocReviewDir: '', pocReviewHistory: [], fingerReviewDir: '', fingerReviewHistory: [] };
 }
 function saveFingerGovState(s) {
     try {
@@ -4738,11 +4743,16 @@ function saveFingerGovState(s) {
             importHistory: s.importHistory || [],
             pocDir: s.pocDir || '',
             pocHistory: s.pocHistory || [],
+            pocReviewDir: s.pocReviewDir || '',
+            pocReviewHistory: s.pocReviewHistory || [],
+            fingerReviewDir: s.fingerReviewDir || '',
+            fingerReviewHistory: s.fingerReviewHistory || [],
         }));
     } catch (e) {}
 }
 const fingerGovState = loadFingerGovState();
 let lastFingerprintImportPreview = null;
+let lastCapabilityScan = null;
 
 function fingerShortPath(p) {
     const parts = String(p || '').split(/[\\/]+/).filter(Boolean);
@@ -4876,6 +4886,7 @@ function renderDDDDFingerprintConverter(container) {
                     placeholder="选择待转换指纹目录，可包含 yaml / json / txt 等" spellcheck="false" />
                 <button class="btn" id="df-src-pick">选择来源目录</button>
                 <button class="btn btn-primary" id="df-run">🔎 转换预览</button>
+                <button class="btn" id="df-save-review">保存审核结果</button>
             </div>
             <div class="nv-history" id="df-src-history"></div>
             <div class="nv-toolbar">
@@ -4900,6 +4911,7 @@ function setupDDDDFingerprintConverter() {
     const elSrc = document.getElementById('df-src');
     const elSrcPick = document.getElementById('df-src-pick');
     const elRun = document.getElementById('df-run');
+    const elSaveReview = document.getElementById('df-save-review');
     const elSrcHist = document.getElementById('df-src-history');
     const elSummary = document.getElementById('df-summary');
     const elResult = document.getElementById('df-result');
@@ -4961,6 +4973,7 @@ function setupDDDDFingerprintConverter() {
         if (e.key === 'Enter') runPreview(elSrc.value.trim());
     });
     elRun.addEventListener('click', () => runPreview(elSrc.value.trim()));
+    elSaveReview.addEventListener('click', saveFingerprintReview);
     elAudit.addEventListener('click', () => {
         const root = elRoot.value.trim();
         if (root) pushFingerHistory('history', 'root', root);
@@ -5066,6 +5079,29 @@ function setupDDDDFingerprintConverter() {
             if (btn) btn.disabled = false;
         }
     }
+
+    async function saveFingerprintReview() {
+        if (!lastFingerprintImportPreview || !lastFingerprintImportPreview.ddddYaml) {
+            toast('请先完成一次转换预览', 'error');
+            return;
+        }
+        elSaveReview.disabled = true;
+        try {
+            const r = await SaveExternalFingerprintReview({
+                projectRoot: elRoot.value.trim(),
+                sourceDir: elSrc.value.trim(),
+                items: lastFingerprintImportPreview.items || [],
+                ddddYaml: lastFingerprintImportPreview.ddddYaml,
+                removed: [],
+            });
+            pushFingerHistory('fingerReviewHistory', 'fingerReviewDir', r.dir || '');
+            toast(`✅ 指纹审核结果已保存: ${r.dir}`, 'success');
+        } catch (err) {
+            toast(`保存失败: ${err}`, 'error');
+        } finally {
+            elSaveReview.disabled = false;
+        }
+    }
 }
 
 function renderFingerprintGovernance(container) {
@@ -5073,7 +5109,7 @@ function renderFingerprintGovernance(container) {
     <div class="fingerprint-governance">
         <div class="extractor-tip">
             🧬 这里检查 dddd 的指纹与 POC 能力: 对比 <code>common/config/finger.yaml</code>、
-            <code>workflow.yaml</code> 与 <code>config/pocs</code>，找出有指纹无 POC、有 POC 无指纹、虚空 POC、残缺 POC 和 workflow 不可调用问题。
+            <code>workflow.yaml</code> 与 <code>common/config/pocs</code>，找出有指纹无 POC、有 POC 无指纹、虚空 POC、残缺 POC 和 workflow 不可调用问题。
         </div>
         <div class="fg-control-card">
             <div class="nv-toolbar">
@@ -5108,6 +5144,7 @@ function renderPocCatalog(container) {
                 placeholder="选择外部 POC 目录，支持递归扫描 yaml / yml" spellcheck="false" />
             <button class="btn" id="pc-src-pick">选择外部 POC</button>
             <button class="btn btn-primary" id="pc-run">▶️ 去重并按 dddd 指纹归类</button>
+            <button class="btn" id="pc-save-review">保存审核结果</button>
         </div>
         <div class="nv-history" id="pc-src-history"></div>
         <div class="fg-summary" id="pc-summary"></div>
@@ -5123,10 +5160,13 @@ function setupPocCatalog() {
     const elSrcPick = document.getElementById('pc-src-pick');
     const elAudit = document.getElementById('pc-open-audit');
     const elRun = document.getElementById('pc-run');
+    const elSaveReview = document.getElementById('pc-save-review');
     const elHist = document.getElementById('pc-history');
     const elSrcHist = document.getElementById('pc-src-history');
     const elSummary = document.getElementById('pc-summary');
     const elResult = document.getElementById('pc-result');
+    let currentReview = null;
+    let removedPocs = [];
 
     elRoot.value = fingerGovState.root || '';
     elSrc.value = fingerGovState.pocDir || '';
@@ -5182,6 +5222,7 @@ function setupPocCatalog() {
         if (e.key === 'Enter') runCatalog(elRoot.value.trim(), elSrc.value.trim());
     });
     elRun.addEventListener('click', () => runCatalog(elRoot.value.trim(), elSrc.value.trim()));
+    elSaveReview.addEventListener('click', savePocReview);
     elAudit.addEventListener('click', () => {
         const root = elRoot.value.trim();
         if (root) pushFingerHistory('history', 'root', root);
@@ -5191,6 +5232,24 @@ function setupPocCatalog() {
         const btn = e.target.closest && e.target.closest('.fg-reveal');
         if (!btn || !elResult.contains(btn)) return;
         RevealInFileManager(btn.dataset.path).catch((err) => toast(String(err), 'error'));
+    });
+    elResult.addEventListener('dblclick', (e) => {
+        const row = e.target.closest && e.target.closest('[data-poc-path]');
+        if (!row || !elResult.contains(row)) return;
+        RevealInFileManager(row.dataset.pocPath).catch((err) => toast(String(err), 'error'));
+    });
+    elResult.addEventListener('contextmenu', (e) => {
+        const row = e.target.closest && e.target.closest('[data-poc-path]');
+        if (!row || !elResult.contains(row)) return;
+        e.preventDefault();
+        const path = row.dataset.pocPath || '';
+        const relPath = row.dataset.pocRel || path;
+        showContextMenu(e.clientX, e.clientY, [
+            { label: '在文件管理器中定位', onClick: () => RevealInFileManager(path).catch((err) => toast(String(err), 'error')) },
+            { label: '用默认应用打开', onClick: () => openWithDefault(path) },
+            { separator: true },
+            { label: '从本次审核结果中移除', danger: true, onClick: () => removePocFromReview(path, relPath) },
+        ]);
     });
 
     async function runCatalog(root, sourceDir) {
@@ -5212,6 +5271,8 @@ function setupPocCatalog() {
         progressTracker.start('fingerprint:external_poc_catalog:progress', '外部 POC 归类');
         try {
             const r = await ClassifyExternalPocsByDDDD(root, sourceDir);
+            currentReview = r;
+            removedPocs = [];
             renderPocCatalogResult(r, elSummary, elResult);
             pushFingerHistory('history', 'root', root);
             pushFingerHistory('pocHistory', 'pocDir', sourceDir);
@@ -5233,6 +5294,37 @@ function setupPocCatalog() {
             elPick.disabled = false;
             elSrcPick.disabled = false;
             elRun.textContent = oldLabel;
+        }
+    }
+
+    function removePocFromReview(path, relPath) {
+        if (!currentReview) return;
+        removedPocs.push({ path, relPath, reason: '人工从本次加载结果移除' });
+        currentReview = filterPocCatalogResult(currentReview, path);
+        renderPocCatalogResult(currentReview, elSummary, elResult);
+        toast(`已从本次结果移除: ${relPath}`, 'info');
+    }
+
+    async function savePocReview() {
+        if (!currentReview || !(currentReview.allPocs || []).length) {
+            toast('请先完成一次外部 POC 归类', 'error');
+            return;
+        }
+        elSaveReview.disabled = true;
+        try {
+            const r = await SaveExternalPocReview({
+                projectRoot: elRoot.value.trim(),
+                sourceDir: elSrc.value.trim(),
+                items: currentReview.allPocs || [],
+                duplicates: currentReview.duplicatePocs || [],
+                removed: removedPocs,
+            });
+            pushFingerHistory('pocReviewHistory', 'pocReviewDir', r.dir || '');
+            toast(`✅ POC 审核结果已保存: ${r.dir}`, 'success');
+        } catch (err) {
+            toast(`保存失败: ${err}`, 'error');
+        } finally {
+            elSaveReview.disabled = false;
         }
     }
 }
@@ -5276,7 +5368,14 @@ function setupFingerprintGovernance() {
         if (e.key === 'Enter') runAudit(elRoot.value.trim());
     });
     elRun.addEventListener('click', () => runAudit(elRoot.value.trim()));
-    elResult.addEventListener('click', (e) => {
+    elResult.addEventListener('click', async (e) => {
+        const copyBtn = e.target.closest && e.target.closest('.fg-copy-object');
+        if (copyBtn && elResult.contains(copyBtn)) {
+            e.preventDefault();
+            e.stopPropagation();
+            await copyToClipboard(copyBtn.dataset.copyObject || '', '对象名');
+            return;
+        }
         const btn = e.target.closest && e.target.closest('.fg-reveal');
         if (!btn || !elResult.contains(btn)) return;
         RevealInFileManager(btn.dataset.path).catch((err) => toast(String(err), 'error'));
@@ -5397,7 +5496,7 @@ function renderFingerprintAuditIssueSections(r) {
             level: '高',
             object: product,
             reason: '指纹产品没有任何已解析 workflow POC 覆盖',
-            target: 'common/config/workflow.yaml / config/pocs',
+            target: 'common/config/workflow.yaml / common/config/pocs',
             fix: '为该产品补 workflow.pocs 并创建或关联对应 POC；若只是资产识别，转入误识别/资产类核对。',
             path: workflowPath || pocDir,
         }))),
@@ -5425,7 +5524,7 @@ function renderFingerprintAuditIssueSections(r) {
             fix: x.rule || '-',
             path: fingerPath,
         }))),
-        renderFingerprintIssueTable('虚空 POC：config/pocs 存在但 workflow 不可调用', r.virtualPocCount || r.orphanPocCount, (r.virtualPocs || r.orphanPocs || []).map((p) => ({
+        renderFingerprintIssueTable('虚空 POC：common/config/pocs 存在但 workflow 不可调用', r.virtualPocCount || r.orphanPocCount, (r.virtualPocs || r.orphanPocs || []).map((p) => ({
             level: '中',
             object: p.relPath || p.name || p.id || '-',
             reason: 'POC 文件未被 workflow.yaml 引用，实战扫描不会调用',
@@ -5493,7 +5592,7 @@ function renderFingerprintAuditIssueSections(r) {
             level: '高',
             object: x.product || '-',
             reason: x.poc || '-',
-            target: 'config/pocs / workflow.yaml',
+            target: 'common/config/pocs / workflow.yaml',
             fix: '创建对应 POC YAML，或从 workflow.pocs 中移除/改正错误引用。',
             path: workflowPath || pocDir,
         }))),
@@ -5504,15 +5603,23 @@ function renderFingerprintAuditIssueSections(r) {
 function renderFingerprintIssueTable(title, total, items) {
     const list = (items || []).filter(Boolean);
     if (!(total || 0) && list.length === 0) return '';
-    const rows = list.map((x) => `
-        <tr>
+    const rows = list.map((x) => {
+        const object = x.object || '-';
+        return `
+        <tr data-poc-path="${escapeHtml(x.path || '')}" data-poc-rel="${escapeHtml(x.relPath || x.name || '')}">
             <td><span class="fg-severity fg-severity-${fingerprintIssueSeverityClass(x.level)}">${escapeHtml(x.level || '-')}</span></td>
-            <td title="${escapeHtml(x.object || '')}">${escapeHtml(x.object || '-')}</td>
+            <td title="${escapeHtml(object)}">
+                <div class="fg-copy-cell">
+                    <span class="fg-copy-value">${escapeHtml(object)}</span>
+                    <button class="fg-copy-object" data-copy-object="${escapeHtml(object)}" title="复制对象名" aria-label="复制对象名">复制</button>
+                </div>
+            </td>
             <td title="${escapeHtml(x.reason || '')}">${escapeHtml(x.reason || '-')}</td>
             <td title="${escapeHtml(x.target || '')}">${escapeHtml(x.target || '-')}</td>
             <td title="${escapeHtml(x.fix || '')}">${escapeHtml(x.fix || '-')}</td>
             <td>${x.path ? `<button class="fg-reveal" data-path="${escapeHtml(x.path)}">定位</button>` : '-'}</td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
     const body = rows ? `
         <div class="fg-table-wrap">
         <table class="fg-table fg-issue-table">
@@ -5559,6 +5666,36 @@ function renderPocCatalogResult(r, elSummary, elResult) {
             ${renderFingerprintPocDetailTable('残缺不完整外部 POC', r.incompletePocCount, r.incompletePocs)}
         </div>`,
     ].join('');
+}
+
+function filterPocCatalogResult(result, path) {
+    const r = { ...result };
+    const same = (x) => (x && x.path) === path;
+    r.allPocs = (result.allPocs || []).filter((x) => !same(x));
+    r.unmatchedPocs = (result.unmatchedPocs || []).filter((x) => !same(x));
+    r.virtualPocs = (result.virtualPocs || []).filter((x) => !same(x));
+    r.incompletePocs = (result.incompletePocs || []).filter((x) => !same(x));
+    r.duplicatePocs = (result.duplicatePocs || []).filter((x) => (x && x.duplicatePath) !== path && (x && x.keptPath) !== path);
+    r.groups = (result.groups || []).map((g) => {
+        const pocs = (g.pocs || []).filter((x) => !same(x));
+        return {
+            ...g,
+            pocs,
+            pocCount: pocs.length,
+            referencedPocCount: pocs.filter((x) => x.referencedByWorkflow).length,
+            unreferencedPocCount: pocs.filter((x) => !x.referencedByWorkflow).length,
+            incompletePocCount: pocs.filter((x) => x.incomplete).length,
+        };
+    }).filter((g) => (g.pocs || []).length > 0);
+    r.pocFileCount = r.allPocs.length;
+    r.uniquePocCount = r.allPocs.filter((x) => !x.duplicate).length;
+    r.duplicatePocCount = r.duplicatePocs.length;
+    r.classifiedPocCount = r.groups.reduce((n, g) => n + (g.pocCount || 0), 0);
+    r.unmatchedPocCount = r.unmatchedPocs.length;
+    r.virtualPocCount = r.virtualPocs.length;
+    r.incompletePocCount = r.incompletePocs.length;
+    r.componentCount = r.groups.length;
+    return r;
 }
 
 function renderPocDuplicateTable(title, total, items) {
@@ -5727,7 +5864,7 @@ function renderFingerprintPocDetailTable(title, total, items, defaultOpen) {
             <td title="${escapeHtml(x.infoName || '')}">${escapeHtml(x.infoName || '-')}</td>
             <td title="${escapeHtml(matched)}">${escapeHtml(matched)}</td>
             <td title="${escapeHtml(workflow)}">${escapeHtml(workflow)}</td>
-            <td title="${escapeHtml(issues)}">${escapeHtml(issues)}</td>
+            <td title="${escapeHtml(issues)}">${x.duplicate ? '<span class="fg-dup-mark">重复</span> ' : ''}${escapeHtml(issues)}</td>
             <td><button class="fg-reveal" data-path="${escapeHtml(x.path || '')}">定位</button></td>
         </tr>`;
     }).join('');
@@ -5774,10 +5911,10 @@ function renderPocCatalogGroups(groups, sourceType = 'builtin', defaultOpen) {
                 p.matchConfidence ? `${p.matchConfidence}` : '',
             ]).filter(Boolean).join(' · ');
             return `
-                <div class="fg-poc-mini-row">
+                <div class="fg-poc-mini-row" data-poc-path="${escapeHtml(p.path || '')}" data-poc-rel="${escapeHtml(p.relPath || p.name || '')}">
                     <button class="fg-reveal" data-path="${escapeHtml(p.path || '')}">定位</button>
                     <span title="${escapeHtml(p.relPath || p.name || '')}">${escapeHtml(p.relPath || p.name || '')}</span>
-                    <em>${escapeHtml(flags)}</em>
+                    <em>${p.duplicate ? '重复' : escapeHtml(flags)}</em>
                 </div>`;
         }).join('');
         const more = (g.pocs || []).length > 80 ? `<div class="fg-empty">还有 ${(g.pocs || []).length - 80} 个 POC 未展示，可看详情列表。</div>` : '';
@@ -5808,6 +5945,215 @@ function renderFingerprintList(title, total, items, defaultOpen) {
     return renderFingerprintSection(title, total || 0, body, list.length, defaultOpen);
 }
 
+function renderExternalCapability(container) {
+    container.innerHTML = `
+    <div class="fingerprint-governance external-capability">
+        <div class="extractor-tip">
+            🧩 扫描已审核的 <code>日期_poc</code> / <code>日期_finger</code>，只展示相对 dddd 新增的指纹规则和 POC；确认后再补充到 <code>finger.yaml</code>、<code>workflow.yaml</code> 与 <code>common/config/pocs</code>。
+        </div>
+        <div class="fg-control-card">
+            <div class="nv-toolbar">
+                <input type="text" class="yaml-path-input" id="ec-root" placeholder="选择 dddd 根目录" spellcheck="false" />
+                <button class="btn" id="ec-root-pick">选择 dddd</button>
+            </div>
+            <div class="nv-history" id="ec-root-history"></div>
+            <div class="nv-toolbar">
+                <input type="text" class="yaml-path-input" id="ec-poc" placeholder="选择已保存的 日期_poc 目录，可为空" spellcheck="false" />
+                <button class="btn" id="ec-poc-pick">选择 日期_poc</button>
+            </div>
+            <div class="nv-history" id="ec-poc-history"></div>
+            <div class="nv-toolbar">
+                <input type="text" class="yaml-path-input" id="ec-finger" placeholder="选择已保存的 日期_finger 目录，可为空" spellcheck="false" />
+                <button class="btn" id="ec-finger-pick">选择 日期_finger</button>
+                <button class="btn btn-primary" id="ec-scan">严格对比新增能力</button>
+            </div>
+            <div class="nv-history" id="ec-finger-history"></div>
+        </div>
+        <div class="fg-summary" id="ec-summary"></div>
+        <div class="fg-result" id="ec-result"></div>
+    </div>`;
+    setupExternalCapability();
+}
+
+function setupExternalCapability() {
+    const elRoot = document.getElementById('ec-root');
+    const elPoc = document.getElementById('ec-poc');
+    const elFinger = document.getElementById('ec-finger');
+    const elRootPick = document.getElementById('ec-root-pick');
+    const elPocPick = document.getElementById('ec-poc-pick');
+    const elFingerPick = document.getElementById('ec-finger-pick');
+    const elScan = document.getElementById('ec-scan');
+    const elRootHist = document.getElementById('ec-root-history');
+    const elPocHist = document.getElementById('ec-poc-history');
+    const elFingerHist = document.getElementById('ec-finger-history');
+    const elSummary = document.getElementById('ec-summary');
+    const elResult = document.getElementById('ec-result');
+
+    elRoot.value = fingerGovState.root || '';
+    elPoc.value = fingerGovState.pocReviewDir || '';
+    elFinger.value = fingerGovState.fingerReviewDir || '';
+
+    function renderHistories() {
+        renderFingerHistoryChips(elRootHist, fingerGovState.history, (p) => { elRoot.value = p; fingerGovState.root = p; saveFingerGovState(fingerGovState); });
+        renderFingerHistoryChips(elPocHist, fingerGovState.pocReviewHistory, (p) => { elPoc.value = p; fingerGovState.pocReviewDir = p; saveFingerGovState(fingerGovState); });
+        renderFingerHistoryChips(elFingerHist, fingerGovState.fingerReviewHistory, (p) => { elFinger.value = p; fingerGovState.fingerReviewDir = p; saveFingerGovState(fingerGovState); });
+    }
+    renderHistories();
+
+    const pickTo = async (el, listName, valueName) => {
+        try {
+            const f = await SelectDirectory();
+            if (!f) return;
+            el.value = f;
+            pushFingerHistory(listName, valueName, f);
+            renderHistories();
+        } catch (err) {
+            toast(`选择失败: ${err}`, 'error');
+        }
+    };
+    elRootPick.addEventListener('click', () => pickTo(elRoot, 'history', 'root'));
+    elPocPick.addEventListener('click', () => pickTo(elPoc, 'pocReviewHistory', 'pocReviewDir'));
+    elFingerPick.addEventListener('click', () => pickTo(elFinger, 'fingerReviewHistory', 'fingerReviewDir'));
+    elRoot.addEventListener('input', () => { fingerGovState.root = elRoot.value.trim(); saveFingerGovState(fingerGovState); });
+    elPoc.addEventListener('input', () => { fingerGovState.pocReviewDir = elPoc.value.trim(); saveFingerGovState(fingerGovState); });
+    elFinger.addEventListener('input', () => { fingerGovState.fingerReviewDir = elFinger.value.trim(); saveFingerGovState(fingerGovState); });
+    elScan.addEventListener('click', () => runScan());
+    elResult.addEventListener('click', async (e) => {
+        const applyBtn = e.target.closest && e.target.closest('#ec-apply');
+        if (applyBtn && elResult.contains(applyBtn)) {
+            await applyCapability();
+            return;
+        }
+        const btn = e.target.closest && e.target.closest('.fg-reveal');
+        if (!btn || !elResult.contains(btn)) return;
+        RevealInFileManager(btn.dataset.path).catch((err) => toast(String(err), 'error'));
+    });
+    elResult.addEventListener('contextmenu', (e) => {
+        const row = e.target.closest && e.target.closest('[data-poc-path]');
+        if (!row || !elResult.contains(row)) return;
+        e.preventDefault();
+        const path = row.dataset.pocPath || '';
+        showContextMenu(e.clientX, e.clientY, [
+            { label: '在文件管理器中定位', onClick: () => RevealInFileManager(path).catch((err) => toast(String(err), 'error')) },
+            { label: '用默认应用打开', onClick: () => openWithDefault(path) },
+        ]);
+    });
+
+    async function runScan() {
+        const root = elRoot.value.trim();
+        const pocDir = elPoc.value.trim();
+        const fingerDir = elFinger.value.trim();
+        if (!root) {
+            toast('请先选择 dddd 根目录', 'error');
+            return;
+        }
+        if (!pocDir && !fingerDir) {
+            toast('至少选择一个 日期_poc 或 日期_finger 目录', 'error');
+            return;
+        }
+        elScan.disabled = true;
+        elResult.innerHTML = `<div class="yaml-empty">正在严格对比新增指纹和 POC…</div>`;
+        elSummary.innerHTML = '';
+        try {
+            const r = await ScanExternalCapability(root, pocDir, fingerDir);
+            lastCapabilityScan = r;
+            pushFingerHistory('history', 'root', root);
+            if (pocDir) pushFingerHistory('pocReviewHistory', 'pocReviewDir', pocDir);
+            if (fingerDir) pushFingerHistory('fingerReviewHistory', 'fingerReviewDir', fingerDir);
+            renderHistories();
+            renderExternalCapabilityResult(r, elSummary, elResult);
+            toast(`对比完成: 新增指纹 ${r.newFingerProducts || 0} 产品 / ${r.newFingerRules || 0} 规则，新增 POC ${r.newPocCount || 0}`, 'success');
+        } catch (err) {
+            elResult.innerHTML = `<div class="poc-validate-fail">❌ 对比失败: ${escapeHtml(err)}</div>`;
+            toast(String(err), 'error');
+        } finally {
+            elScan.disabled = false;
+        }
+    }
+
+    async function applyCapability() {
+        if (!lastCapabilityScan) {
+            toast('请先完成一次新增能力对比', 'error');
+            return;
+        }
+        const input = elResult.querySelector('#ec-confirm');
+        const confirmation = (input && input.value || '').trim();
+        if (confirmation !== 'APPLY_EXTERNAL_CAPABILITY') {
+            toast('请输入 APPLY_EXTERNAL_CAPABILITY 后再写回', 'error');
+            return;
+        }
+        const btn = elResult.querySelector('#ec-apply');
+        if (btn) btn.disabled = true;
+        try {
+            const r = await ApplyExternalCapability({
+                projectRoot: elRoot.value.trim(),
+                newFingerYaml: lastCapabilityScan.newFingerYaml || '',
+                newPocs: lastCapabilityScan.newPocs || [],
+                confirm: true,
+                confirmation,
+            });
+            toast(`✅ 接入完成: 指纹规则 +${r.rulesAdded || 0}，POC +${r.pocsCopied || 0}`, 'success');
+            const status = elResult.querySelector('#ec-apply-status');
+            if (status) status.innerHTML = `
+                <div class="fg-apply-ok">finger 备份: <code>${escapeHtml(r.fingerBackupPath || '未变更')}</code></div>
+                <div class="fg-apply-ok">workflow 备份: <code>${escapeHtml(r.workflowBackupPath || '未变更')}</code></div>
+                <div class="fg-apply-ok">POC 目录: <code>${escapeHtml(r.pocTargetDir || '未复制')}</code></div>
+                <div class="fg-apply-ok">日志: <code>${escapeHtml(r.logPath || '')}</code></div>`;
+        } catch (err) {
+            toast(`接入失败: ${err}`, 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+}
+
+function renderExternalCapabilityResult(r, elSummary, elResult) {
+    const stat = (label, value, tone = '') => `
+        <div class="fg-stat ${tone}">
+            <div class="fg-stat-value">${escapeHtml(value)}</div>
+            <div class="fg-stat-label">${escapeHtml(label)}</div>
+        </div>`;
+    elSummary.innerHTML = `
+        <div class="fg-stat-grid">
+            ${stat('新增指纹产品', r.newFingerProducts || 0, (r.newFingerProducts || 0) ? 'fg-good' : '')}
+            ${stat('新增指纹规则', r.newFingerRules || 0, (r.newFingerRules || 0) ? 'fg-good' : '')}
+            ${stat('新增 POC', r.newPocCount || 0, (r.newPocCount || 0) ? 'fg-good' : '')}
+        </div>
+        <div class="fg-paths">
+            <div><b>dddd:</b> <code>${escapeHtml(r.projectRoot || '')}</code></div>
+            <div><b>poc:</b> <code>${escapeHtml(r.pocReviewDir || '')}</code></div>
+            <div><b>finger:</b> <code>${escapeHtml(r.fingerReviewDir || '')}</code></div>
+        </div>`;
+    const fingerRows = (r.newFingers || []).map((x) => `
+        <tr>
+            <td title="${escapeHtml(x.product || '')}">${escapeHtml(x.product || '')}</td>
+            <td title="${escapeHtml((x.rules || []).join('\n'))}">${escapeHtml((x.rules || []).join('\n'))}</td>
+        </tr>`).join('');
+    const pocRows = (r.newPocs || []).map((x) => `
+        <tr data-poc-path="${escapeHtml(x.path || '')}" data-poc-rel="${escapeHtml(x.relPath || x.name || '')}">
+            <td title="${escapeHtml(x.matchedProduct || '')}">${escapeHtml(x.matchedProduct || '-')}</td>
+            <td title="${escapeHtml(x.relPath || x.name || '')}">${x.duplicate ? '<span class="fg-dup-mark">重复</span> ' : ''}${escapeHtml(x.relPath || x.name || '')}</td>
+            <td title="${escapeHtml(x.id || '')}">${escapeHtml(x.id || '-')}</td>
+            <td>${escapeHtml(x.matchConfidence || 0)}</td>
+            <td><button class="fg-reveal" data-path="${escapeHtml(x.path || '')}">定位</button></td>
+        </tr>`).join('');
+    elResult.innerHTML = `
+        <div class="fg-result-grid">
+            ${renderFingerprintSection('新增指纹规则', r.newFingerProducts || 0, fingerRows ? `
+                <div class="fg-table-wrap"><table class="fg-table"><thead><tr><th>产品</th><th>新增规则</th></tr></thead><tbody>${fingerRows}</tbody></table></div>` : '', (r.newFingers || []).length)}
+            ${renderFingerprintSection('新增 POC', r.newPocCount || 0, pocRows ? `
+                <div class="fg-table-wrap"><table class="fg-table fg-poc-finger-table"><thead><tr><th>建议产品</th><th>POC</th><th>ID</th><th>置信</th><th>操作</th></tr></thead><tbody>${pocRows}</tbody></table></div>` : '', (r.newPocs || []).length)}
+        </div>
+        <details class="fg-section fg-apply-section" ${(r.newFingerRules || r.newPocCount) ? 'open' : ''}>
+            <summary>确认接入 dddd <span>会备份 finger.yaml / workflow.yaml</span></summary>
+            <div class="fg-apply-box">
+                <input id="ec-confirm" class="yaml-path-input" placeholder="输入 APPLY_EXTERNAL_CAPABILITY 后才能写回" spellcheck="false" />
+                <button id="ec-apply" class="btn btn-primary">写入新增能力</button>
+                <div id="ec-apply-status"></div>
+            </div>
+        </details>`;
+}
+
 // ============================================================
 // 路由 / 侧栏
 // ============================================================
@@ -5816,12 +6162,14 @@ const routes = {
     'fingerprint-governance': { module: '辅助模块', name: 'dddd 能力对比', render: renderFingerprintGovernance },
     'poc-catalog':       { module: '辅助模块', name: '外部 POC 归类', render: renderPocCatalog      },
     'dddd-fingerprint-converter': { module: '转换模块', name: '外部指纹导入', render: renderDDDDFingerprintConverter },
+    'external-capability': { module: '辅助模块', name: '能力接入', render: renderExternalCapability },
 };
 
 const moduleByTool = {
     'fingerprint-governance': 'aux',
     'poc-catalog':       'aux',
     'dddd-fingerprint-converter': 'convert',
+    'external-capability': 'aux',
 };
 
 // 持久化当前路由 key, 跨次启动 / wails dev 热重载后能回到上次的页面.
@@ -5838,12 +6186,6 @@ function loadRoute() {
 function navigate(toolId) {
     const route = routes[toolId];
     if (!route) return;
-    // DIAG: 临时日志, 排查 "加载 Awesome-POC 时自动跳转" 问题. 把调用栈打出来.
-    // 复现后看 console 第一条非用户点击触发的 navigate 是谁调的.
-    try {
-        console.log('[nav]', toolId, 'at', new Date().toISOString());
-        console.trace('[nav-stack]');
-    } catch (e) {}
     saveRoute(toolId);
 
     // 高亮侧栏
@@ -5862,34 +6204,15 @@ function navigate(toolId) {
 
 // 侧栏点击
 document.querySelectorAll('.submenu-item').forEach((el) => {
-    el.addEventListener('click', (e) => {
-        console.log('[submenu-click]', el.dataset.tool, 'event:', e.type, 'isTrusted:', e.isTrusted, 'target:', e.target);
+    el.addEventListener('click', () => {
         navigate(el.dataset.tool);
     });
 });
-
-// DIAG: 捕获捕获阶段的全局 click, 看到底是谁在点 submenu / 触发 nav.
-// 真用户点击 isTrusted=true; 程序触发的 .click() / dispatchEvent 是 false.
-document.addEventListener('click', (e) => {
-    const t = e.target;
-    if (t instanceof HTMLElement) {
-        const submenu = t.closest('.submenu-item');
-        if (submenu) {
-            console.log('[global-click] submenu hit', submenu.dataset.tool, 'isTrusted:', e.isTrusted, 'phase:', e.eventPhase);
-            console.trace('[global-click-stack]');
-        }
-    }
-}, true); // capture 阶段
-
-// 全局未捕获异常和 promise reject 也记下来
-window.addEventListener('error', (e) => console.error('[window-error]', e.error || e.message));
-window.addEventListener('unhandledrejection', (e) => console.error('[unhandled-rejection]', e.reason));
 
 // 启动: 优先恢复上次访问的页面, 否则默认进 dddd 能力对比.
 // 用 routes 校验避免老 localStorage 残留指向已删的工具.
 {
     const last = loadRoute();
     const target = last && routes[last] ? last : 'fingerprint-governance';
-    console.log('[boot] last route =', last, '→ navigating to', target);
     navigate(target);
 }

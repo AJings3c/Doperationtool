@@ -110,6 +110,104 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ExternalPocNewItem {
+	    path: string;
+	    relPath: string;
+	    name: string;
+	    id: string;
+	    infoName: string;
+	    matchedProduct: string;
+	    matchConfidence: number;
+	    contentHash: string;
+	    duplicate: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new ExternalPocNewItem(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.relPath = source["relPath"];
+	        this.name = source["name"];
+	        this.id = source["id"];
+	        this.infoName = source["infoName"];
+	        this.matchedProduct = source["matchedProduct"];
+	        this.matchConfidence = source["matchConfidence"];
+	        this.contentHash = source["contentHash"];
+	        this.duplicate = source["duplicate"];
+	    }
+	}
+	export class ApplyExternalCapabilityRequest {
+	    projectRoot: string;
+	    newFingerYaml: string;
+	    newPocs: ExternalPocNewItem[];
+	    confirm: boolean;
+	    confirmation: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ApplyExternalCapabilityRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.newFingerYaml = source["newFingerYaml"];
+	        this.newPocs = this.convertValues(source["newPocs"], ExternalPocNewItem);
+	        this.confirm = source["confirm"];
+	        this.confirmation = source["confirmation"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApplyExternalCapabilityResult {
+	    fingerBackupPath: string;
+	    workflowBackupPath: string;
+	    pocTargetDir: string;
+	    productsCreated: number;
+	    productsMerged: number;
+	    rulesAdded: number;
+	    rulesSkipped: number;
+	    pocsCopied: number;
+	    workflowProducts: number;
+	    logPath: string;
+	    changedProducts: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new ApplyExternalCapabilityResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fingerBackupPath = source["fingerBackupPath"];
+	        this.workflowBackupPath = source["workflowBackupPath"];
+	        this.pocTargetDir = source["pocTargetDir"];
+	        this.productsCreated = source["productsCreated"];
+	        this.productsMerged = source["productsMerged"];
+	        this.rulesAdded = source["rulesAdded"];
+	        this.rulesSkipped = source["rulesSkipped"];
+	        this.pocsCopied = source["pocsCopied"];
+	        this.workflowProducts = source["workflowProducts"];
+	        this.logPath = source["logPath"];
+	        this.changedProducts = source["changedProducts"];
+	    }
+	}
 
 	export class AutoFixOptions {
 	    dryRun: boolean;
@@ -633,6 +731,69 @@ export namespace main {
 		}
 	}
 
+	export class fingerEntryView {
+	    product: string;
+	    rules: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new fingerEntryView(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.product = source["product"];
+	        this.rules = source["rules"];
+	    }
+	}
+	export class ExternalCapabilityScanResult {
+	    projectRoot: string;
+	    pocReviewDir: string;
+	    fingerReviewDir: string;
+	    newFingerProducts: number;
+	    newFingerRules: number;
+	    newPocCount: number;
+	    newFingerYaml: string;
+	    newFingers: fingerEntryView[];
+	    newPocs: ExternalPocNewItem[];
+	    logPath: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ExternalCapabilityScanResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.pocReviewDir = source["pocReviewDir"];
+	        this.fingerReviewDir = source["fingerReviewDir"];
+	        this.newFingerProducts = source["newFingerProducts"];
+	        this.newFingerRules = source["newFingerRules"];
+	        this.newPocCount = source["newPocCount"];
+	        this.newFingerYaml = source["newFingerYaml"];
+	        this.newFingers = this.convertValues(source["newFingers"], fingerEntryView);
+	        this.newPocs = this.convertValues(source["newPocs"], ExternalPocNewItem);
+	        this.logPath = source["logPath"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
 
 	export class FingerprintCoverage {
 	    product: string;
@@ -802,6 +963,10 @@ export namespace main {
 	    incomplete: boolean;
 	    issues: string[];
 	    contentHash?: string;
+	    duplicate?: boolean;
+	    duplicateKey?: string;
+	    duplicateReason?: string;
+	    duplicateOf?: string;
 
 	    static createFrom(source: any = {}) {
 	        return new FingerprintPocInfo(source);
@@ -824,6 +989,10 @@ export namespace main {
 	        this.incomplete = source["incomplete"];
 	        this.issues = source["issues"];
 	        this.contentHash = source["contentHash"];
+	        this.duplicate = source["duplicate"];
+	        this.duplicateKey = source["duplicateKey"];
+	        this.duplicateReason = source["duplicateReason"];
+	        this.duplicateOf = source["duplicateOf"];
 	    }
 	}
 	export class FingerprintWorkflowPoc {
@@ -1493,6 +1662,98 @@ export namespace main {
 		}
 	}
 
+	export class ReviewRemovedItem {
+	    path: string;
+	    relPath: string;
+	    reason: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ReviewRemovedItem(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.relPath = source["relPath"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class SaveExternalFingerprintReviewRequest {
+	    projectRoot: string;
+	    sourceDir: string;
+	    items: FingerprintImportItem[];
+	    ddddYaml: string;
+	    removed: ReviewRemovedItem[];
+
+	    static createFrom(source: any = {}) {
+	        return new SaveExternalFingerprintReviewRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.sourceDir = source["sourceDir"];
+	        this.items = this.convertValues(source["items"], FingerprintImportItem);
+	        this.ddddYaml = source["ddddYaml"];
+	        this.removed = this.convertValues(source["removed"], ReviewRemovedItem);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SaveExternalPocReviewRequest {
+	    projectRoot: string;
+	    sourceDir: string;
+	    items: FingerprintPocInfo[];
+	    duplicates: FingerprintPocDuplicate[];
+	    removed: ReviewRemovedItem[];
+
+	    static createFrom(source: any = {}) {
+	        return new SaveExternalPocReviewRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.sourceDir = source["sourceDir"];
+	        this.items = this.convertValues(source["items"], FingerprintPocInfo);
+	        this.duplicates = this.convertValues(source["duplicates"], FingerprintPocDuplicate);
+	        this.removed = this.convertValues(source["removed"], ReviewRemovedItem);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SkippedItem {
 	    name: string;
 	    reason: string;
@@ -1548,6 +1809,24 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class SavedReviewResult {
+	    dir: string;
+	    kind: string;
+	    count: number;
+	    logPath: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SavedReviewResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dir = source["dir"];
+	        this.kind = source["kind"];
+	        this.count = source["count"];
+	        this.logPath = source["logPath"];
+	    }
 	}
 
 
