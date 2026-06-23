@@ -4753,6 +4753,7 @@ function saveFingerGovState(s) {
 const fingerGovState = loadFingerGovState();
 let lastFingerprintImportPreview = null;
 let lastCapabilityScan = null;
+let lastCapabilitySelection = null;
 
 function fingerShortPath(p) {
     const parts = String(p || '').split(/[\\/]+/).filter(Boolean);
@@ -6019,6 +6020,12 @@ function setupExternalCapability() {
     elFinger.addEventListener('input', () => { fingerGovState.fingerReviewDir = elFinger.value.trim(); saveFingerGovState(fingerGovState); });
     elScan.addEventListener('click', () => runScan());
     elResult.addEventListener('click', async (e) => {
+        const toggleBtn = e.target.closest && e.target.closest('.ec-toggle-all');
+        if (toggleBtn && elResult.contains(toggleBtn)) {
+            toggleExternalCapabilitySelection(toggleBtn.dataset.kind, toggleBtn.dataset.checked === 'true');
+            renderExternalCapabilityResult(lastCapabilityScan, elSummary, elResult);
+            return;
+        }
         const applyBtn = e.target.closest && e.target.closest('#ec-apply');
         if (applyBtn && elResult.contains(applyBtn)) {
             await applyCapability();
@@ -6027,6 +6034,12 @@ function setupExternalCapability() {
         const btn = e.target.closest && e.target.closest('.fg-reveal');
         if (!btn || !elResult.contains(btn)) return;
         RevealInFileManager(btn.dataset.path).catch((err) => toast(String(err), 'error'));
+    });
+    elResult.addEventListener('change', (e) => {
+        const check = e.target.closest && e.target.closest('.ec-select-item');
+        if (!check || !elResult.contains(check)) return;
+        updateExternalCapabilitySelection(check);
+        renderExternalCapabilityResult(lastCapabilityScan, elSummary, elResult);
     });
     elResult.addEventListener('contextmenu', (e) => {
         const row = e.target.closest && e.target.closest('[data-poc-path]');
@@ -6057,6 +6070,7 @@ function setupExternalCapability() {
         try {
             const r = await ScanExternalCapability(root, pocDir, fingerDir);
             lastCapabilityScan = r;
+            lastCapabilitySelection = buildExternalCapabilitySelection(r);
             pushFingerHistory('history', 'root', root);
             if (pocDir) pushFingerHistory('pocReviewHistory', 'pocReviewDir', pocDir);
             if (fingerDir) pushFingerHistory('fingerReviewHistory', 'fingerReviewDir', fingerDir);
@@ -6076,6 +6090,11 @@ function setupExternalCapability() {
             toast('请先完成一次新增能力对比', 'error');
             return;
         }
+        const selected = selectedExternalCapability(lastCapabilityScan);
+        if (!selected.fingers.length && !selected.pocs.length) {
+            toast('请至少选择一项指纹规则或 POC 再写回', 'error');
+            return;
+        }
         const input = elResult.querySelector('#ec-confirm');
         const confirmation = (input && input.value || '').trim();
         if (confirmation !== 'APPLY_EXTERNAL_CAPABILITY') {
@@ -6087,8 +6106,8 @@ function setupExternalCapability() {
         try {
             const r = await ApplyExternalCapability({
                 projectRoot: elRoot.value.trim(),
-                newFingerYaml: lastCapabilityScan.newFingerYaml || '',
-                newPocs: lastCapabilityScan.newPocs || [],
+                newFingerYaml: renderExternalFingerYaml(selected.fingers),
+                newPocs: selected.pocs,
                 confirm: true,
                 confirmation,
             });
@@ -6110,6 +6129,10 @@ function setupExternalCapability() {
 }
 
 function renderExternalCapabilityResult(r, elSummary, elResult) {
+    if (!r) return;
+    if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(r);
+    const selected = selectedExternalCapability(r);
+    const selectedRuleCount = selected.fingers.reduce((n, x) => n + ((x.rules || []).length), 0);
     const stat = (label, value, tone = '') => `
         <div class="fg-stat ${tone}">
             <div class="fg-stat-value">${escapeHtml(value)}</div>
@@ -6120,6 +6143,7 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
             ${stat('新增指纹产品', r.newFingerProducts || 0, (r.newFingerProducts || 0) ? 'fg-good' : '')}
             ${stat('新增指纹规则', r.newFingerRules || 0, (r.newFingerRules || 0) ? 'fg-good' : '')}
             ${stat('新增 POC', r.newPocCount || 0, (r.newPocCount || 0) ? 'fg-good' : '')}
+            ${stat('已选择', `${selected.fingers.length} 产品 / ${selected.pocs.length} POC`, (selected.fingers.length || selected.pocs.length) ? 'fg-good' : 'fg-bad')}
         </div>
         <div class="fg-paths">
             <div><b>dddd:</b> <code>${escapeHtml(r.projectRoot || '')}</code></div>
@@ -6128,11 +6152,13 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
         </div>`;
     const fingerRows = (r.newFingers || []).map((x) => `
         <tr>
+            <td><input type="checkbox" class="ec-select-item" data-kind="finger" data-key="${escapeHtml(x.product || '')}" ${isExternalFingerSelected(x.product) ? 'checked' : ''} /></td>
             <td title="${escapeHtml(x.product || '')}">${escapeHtml(x.product || '')}</td>
             <td title="${escapeHtml((x.rules || []).join('\n'))}">${escapeHtml((x.rules || []).join('\n'))}</td>
         </tr>`).join('');
     const pocRows = (r.newPocs || []).map((x) => `
         <tr data-poc-path="${escapeHtml(x.path || '')}" data-poc-rel="${escapeHtml(x.relPath || x.name || '')}">
+            <td><input type="checkbox" class="ec-select-item" data-kind="poc" data-key="${escapeHtml(x.path || '')}" ${isExternalPocSelected(x.path) ? 'checked' : ''} /></td>
             <td title="${escapeHtml(x.matchedProduct || '')}">${escapeHtml(x.matchedProduct || '-')}</td>
             <td title="${escapeHtml(x.relPath || x.name || '')}">${x.duplicate ? '<span class="fg-dup-mark">重复</span> ' : ''}${escapeHtml(x.relPath || x.name || '')}</td>
             <td title="${escapeHtml(x.id || '')}">${escapeHtml(x.id || '-')}</td>
@@ -6142,14 +6168,17 @@ function renderExternalCapabilityResult(r, elSummary, elResult) {
     elResult.innerHTML = `
         <div class="fg-result-grid">
             ${renderFingerprintSection('新增指纹规则', r.newFingerProducts || 0, fingerRows ? `
-                <div class="fg-table-wrap"><table class="fg-table"><thead><tr><th>产品</th><th>新增规则</th></tr></thead><tbody>${fingerRows}</tbody></table></div>` : '', (r.newFingers || []).length)}
+                ${renderExternalCapabilitySelectionToolbar('finger')}
+                <div class="fg-table-wrap"><table class="fg-table"><thead><tr><th>选择</th><th>产品</th><th>新增规则</th></tr></thead><tbody>${fingerRows}</tbody></table></div>` : '', (r.newFingers || []).length)}
             ${renderFingerprintSection('新增 POC', r.newPocCount || 0, pocRows ? `
-                <div class="fg-table-wrap"><table class="fg-table fg-poc-finger-table"><thead><tr><th>建议产品</th><th>POC</th><th>ID</th><th>置信</th><th>操作</th></tr></thead><tbody>${pocRows}</tbody></table></div>` : '', (r.newPocs || []).length)}
-            ${renderExternalCapabilityPlanTable('写入前 POC 复制计划', r.pocApplyPlan || [])}
+                ${renderExternalCapabilitySelectionToolbar('poc')}
+                <div class="fg-table-wrap"><table class="fg-table fg-poc-finger-table"><thead><tr><th>选择</th><th>建议产品</th><th>POC</th><th>ID</th><th>置信</th><th>操作</th></tr></thead><tbody>${pocRows}</tbody></table></div>` : '', (r.newPocs || []).length)}
+            ${renderExternalCapabilityPlanTable('写入前 POC 复制计划', selectedPocPlan(r))}
         </div>
         <details class="fg-section fg-apply-section" ${(r.newFingerRules || r.newPocCount) ? 'open' : ''}>
             <summary>确认接入 dddd <span>会备份 finger.yaml / workflow.yaml</span></summary>
             <div class="fg-apply-box">
+                <div class="fg-apply-selection">本次将写入 ${escapeHtml(selected.fingers.length)} 个指纹产品 / ${escapeHtml(selectedRuleCount)} 条规则，${escapeHtml(selected.pocs.length)} 个 POC。</div>
                 <input id="ec-confirm" class="yaml-path-input" placeholder="输入 APPLY_EXTERNAL_CAPABILITY 后才能写回" spellcheck="false" />
                 <button id="ec-apply" class="btn btn-primary">写入新增能力</button>
                 <div id="ec-apply-status"></div>
@@ -6174,6 +6203,78 @@ function renderExternalCapabilityPlanTable(title, plans) {
                 <tbody>${rows}</tbody>
             </table>
         </div>`, list.length);
+}
+
+function buildExternalCapabilitySelection(r) {
+    return {
+        fingerProducts: new Set((r.newFingers || []).map((x) => x.product || '').filter(Boolean)),
+        pocPaths: new Set((r.newPocs || []).map((x) => x.path || '').filter(Boolean)),
+    };
+}
+
+function isExternalFingerSelected(product) {
+    return !!(lastCapabilitySelection && lastCapabilitySelection.fingerProducts && lastCapabilitySelection.fingerProducts.has(product || ''));
+}
+
+function isExternalPocSelected(path) {
+    return !!(lastCapabilitySelection && lastCapabilitySelection.pocPaths && lastCapabilitySelection.pocPaths.has(path || ''));
+}
+
+function updateExternalCapabilitySelection(check) {
+    if (!lastCapabilitySelection) lastCapabilitySelection = { fingerProducts: new Set(), pocPaths: new Set() };
+    const set = check.dataset.kind === 'finger' ? lastCapabilitySelection.fingerProducts : lastCapabilitySelection.pocPaths;
+    const key = check.dataset.key || '';
+    if (!key) return;
+    if (check.checked) set.add(key);
+    else set.delete(key);
+}
+
+function toggleExternalCapabilitySelection(kind, checked) {
+    if (!lastCapabilityScan) return;
+    if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(lastCapabilityScan);
+    if (kind === 'finger') {
+        lastCapabilitySelection.fingerProducts = checked
+            ? new Set((lastCapabilityScan.newFingers || []).map((x) => x.product || '').filter(Boolean))
+            : new Set();
+    } else if (kind === 'poc') {
+        lastCapabilitySelection.pocPaths = checked
+            ? new Set((lastCapabilityScan.newPocs || []).map((x) => x.path || '').filter(Boolean))
+            : new Set();
+    }
+}
+
+function selectedExternalCapability(r) {
+    if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(r);
+    return {
+        fingers: (r.newFingers || []).filter((x) => isExternalFingerSelected(x.product)),
+        pocs: (r.newPocs || []).filter((x) => isExternalPocSelected(x.path)),
+    };
+}
+
+function selectedPocPlan(r) {
+    if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(r);
+    return (r.pocApplyPlan || []).filter((x) => isExternalPocSelected(x.sourcePath));
+}
+
+function renderExternalCapabilitySelectionToolbar(kind) {
+    return `
+        <div class="ec-select-toolbar">
+            <button class="fg-copy-object ec-toggle-all" data-kind="${escapeHtml(kind)}" data-checked="true">全选</button>
+            <button class="fg-copy-object ec-toggle-all" data-kind="${escapeHtml(kind)}" data-checked="false">全不选</button>
+        </div>`;
+}
+
+function renderExternalFingerYaml(fingers) {
+    const list = (fingers || []).filter((x) => x && x.product && (x.rules || []).length);
+    if (!list.length) return '';
+    return list.map((entry) => [
+        `${yamlSingleQuote(entry.product)}:`,
+        ...(entry.rules || []).map((rule) => `  - ${yamlSingleQuote(rule)}`),
+    ].join('\n')).join('\n\n') + '\n';
+}
+
+function yamlSingleQuote(s) {
+    return `'${String(s || '').replace(/'/g, "''")}'`;
 }
 
 function renderExternalCapabilityPostAudit(audit, err) {

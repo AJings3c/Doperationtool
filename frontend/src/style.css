@@ -2551,6 +2551,13 @@ a {
     color: #3fb950;
     margin-top: 4px;
 }
+.fg-apply-selection {
+    color: var(--text-2);
+    background: rgba(88, 166, 255, 0.08);
+    border: 1px solid rgba(88, 166, 255, 0.22);
+    border-radius: 6px;
+    padding: 7px 9px;
+}
 .fg-apply-audit {
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -2572,6 +2579,16 @@ a {
 .fg-apply-audit-bad {
     border-color: rgba(248, 81, 73, 0.45);
     background: rgba(248, 81, 73, 0.08);
+}
+.ec-select-toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 0 0 8px;
+}
+.ec-select-item {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
 }
 .poc-dddd-card {
     border: 1px solid var(--border);
