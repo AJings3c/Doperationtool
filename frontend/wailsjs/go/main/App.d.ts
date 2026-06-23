@@ -46,6 +46,8 @@ export function PreviewFingerprintImport(arg1:string,arg2:string):Promise<main.F
 
 export function RevealInFileManager(arg1:string):Promise<void>;
 
+export function RestoreExternalCapabilityBackup(arg1:main.RestoreExternalCapabilityBackupRequest):Promise<main.RestoreExternalCapabilityBackupResult>;
+
 export function SaveExternalFingerprintReview(arg1:main.SaveExternalFingerprintReviewRequest):Promise<main.SavedReviewResult>;
 
 export function SaveExternalPocReview(arg1:main.SaveExternalPocReviewRequest):Promise<main.SavedReviewResult>;

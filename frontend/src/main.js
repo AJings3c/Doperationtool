@@ -23,6 +23,7 @@ import {
     OpenWithDefaultApp,
     PreviewFingerprintImport,
     RevealInFileManager,
+    RestoreExternalCapabilityBackup,
     SaveExternalFingerprintReview,
     SaveExternalPocReview,
     SaveSourceFile,
@@ -4754,6 +4755,7 @@ const fingerGovState = loadFingerGovState();
 let lastFingerprintImportPreview = null;
 let lastCapabilityScan = null;
 let lastCapabilitySelection = null;
+let lastCapabilityApplyResult = null;
 
 function fingerShortPath(p) {
     const parts = String(p || '').split(/[\\/]+/).filter(Boolean);
@@ -6031,6 +6033,11 @@ function setupExternalCapability() {
             await applyCapability();
             return;
         }
+        const restoreBtn = e.target.closest && e.target.closest('#ec-restore');
+        if (restoreBtn && elResult.contains(restoreBtn)) {
+            await restoreCapabilityBackup();
+            return;
+        }
         const btn = e.target.closest && e.target.closest('.fg-reveal');
         if (!btn || !elResult.contains(btn)) return;
         RevealInFileManager(btn.dataset.path).catch((err) => toast(String(err), 'error'));
@@ -6111,6 +6118,7 @@ function setupExternalCapability() {
                 confirm: true,
                 confirmation,
             });
+            lastCapabilityApplyResult = r;
             toast(`✅ 接入完成: 指纹规则 +${r.rulesAdded || 0}，POC +${r.pocsCopied || 0}`, 'success');
             const status = elResult.querySelector('#ec-apply-status');
             if (status) status.innerHTML = `
@@ -6119,9 +6127,44 @@ function setupExternalCapability() {
                 <div class="fg-apply-ok">POC 目录: <code>${escapeHtml(r.pocTargetDir || '未复制')}</code></div>
                 <div class="fg-apply-ok">日志: <code>${escapeHtml(r.logPath || '')}</code></div>
                 ${renderExternalCapabilityPlanTable('实际 POC 写入结果', r.pocApplyPlan || [])}
-                ${renderExternalCapabilityPostAudit(r.postAudit, r.postAuditError)}`;
+                ${renderExternalCapabilityPostAudit(r.postAudit, r.postAuditError)}
+                ${renderExternalCapabilityRestoreBox(r)}`;
         } catch (err) {
             toast(`接入失败: ${err}`, 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function restoreCapabilityBackup() {
+        if (!lastCapabilityApplyResult || (!lastCapabilityApplyResult.fingerBackupPath && !lastCapabilityApplyResult.workflowBackupPath)) {
+            toast('没有可恢复的本次接入备份', 'error');
+            return;
+        }
+        const input = elResult.querySelector('#ec-restore-confirm');
+        const confirmation = (input && input.value || '').trim();
+        if (confirmation !== 'RESTORE_EXTERNAL_CAPABILITY') {
+            toast('请输入 RESTORE_EXTERNAL_CAPABILITY 后再恢复', 'error');
+            return;
+        }
+        const btn = elResult.querySelector('#ec-restore');
+        if (btn) btn.disabled = true;
+        try {
+            const r = await RestoreExternalCapabilityBackup({
+                projectRoot: elRoot.value.trim(),
+                fingerBackupPath: lastCapabilityApplyResult.fingerBackupPath || '',
+                workflowBackupPath: lastCapabilityApplyResult.workflowBackupPath || '',
+                confirm: true,
+                confirmation,
+            });
+            toast('已恢复本次接入前的 finger/workflow 备份', 'success');
+            const status = elResult.querySelector('#ec-restore-status');
+            if (status) status.innerHTML = `
+                <div class="fg-apply-ok">恢复 finger: ${r.restoredFinger ? '是' : '否'}，当前版本备份: <code>${escapeHtml(r.fingerCurrentBackupPath || '无')}</code></div>
+                <div class="fg-apply-ok">恢复 workflow: ${r.restoredWorkflow ? '是' : '否'}，当前版本备份: <code>${escapeHtml(r.workflowCurrentBackupPath || '无')}</code></div>
+                <div class="fg-apply-ok">日志: <code>${escapeHtml(r.logPath || '')}</code></div>`;
+        } catch (err) {
+            toast(`恢复失败: ${err}`, 'error');
         } finally {
             if (btn) btn.disabled = false;
         }
@@ -6288,6 +6331,17 @@ function renderExternalCapabilityPostAudit(audit, err) {
         <div class="fg-apply-audit ${tone}">
             <strong>${escapeHtml(label)}</strong>
             <span>缺失 POC ${escapeHtml(audit.missingPocCount || 0)} · 虚空 POC ${escapeHtml(audit.virtualPocCount || 0)} · 残缺 POC ${escapeHtml(audit.incompletePocCount || 0)} · 无指纹 POC ${escapeHtml(audit.pocWithoutFingerCount || 0)} · 有指纹无 POC ${escapeHtml(audit.fingerWithoutPocCount || 0)}</span>
+        </div>`;
+}
+
+function renderExternalCapabilityRestoreBox(r) {
+    if (!r || (!r.fingerBackupPath && !r.workflowBackupPath)) return '';
+    return `
+        <div class="fg-restore-box">
+            <div class="fg-restore-title">需要回滚本次接入时，可恢复写入前备份。</div>
+            <input id="ec-restore-confirm" class="yaml-path-input" placeholder="输入 RESTORE_EXTERNAL_CAPABILITY 后才能恢复" spellcheck="false" />
+            <button id="ec-restore" class="btn">恢复本次接入前备份</button>
+            <div id="ec-restore-status"></div>
         </div>`;
 }
 

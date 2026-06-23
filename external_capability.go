@@ -142,6 +142,22 @@ type ExternalCapabilityAuditSummary struct {
 	Elapsed                    string `json:"elapsed"`
 }
 
+type RestoreExternalCapabilityBackupRequest struct {
+	ProjectRoot        string `json:"projectRoot"`
+	FingerBackupPath   string `json:"fingerBackupPath"`
+	WorkflowBackupPath string `json:"workflowBackupPath"`
+	Confirm            bool   `json:"confirm"`
+	Confirmation       string `json:"confirmation"`
+}
+
+type RestoreExternalCapabilityBackupResult struct {
+	RestoredFinger            bool   `json:"restoredFinger"`
+	RestoredWorkflow          bool   `json:"restoredWorkflow"`
+	FingerCurrentBackupPath   string `json:"fingerCurrentBackupPath"`
+	WorkflowCurrentBackupPath string `json:"workflowCurrentBackupPath"`
+	LogPath                   string `json:"logPath"`
+}
+
 func (a *App) SaveExternalPocReview(req SaveExternalPocReviewRequest) (*SavedReviewResult, error) {
 	if len(req.Items) == 0 {
 		return nil, fmt.Errorf("没有可保存的 POC 审核项")
@@ -403,6 +419,83 @@ func (a *App) ApplyExternalCapability(req ApplyExternalCapabilityRequest) (*Appl
 		appendReviewLog(logPath, "post_apply_audit", map[string]any{"passed": res.PostAudit.Passed, "issues": res.PostAudit.IssueCount, "missingPocs": res.PostAudit.MissingPocCount, "virtualPocs": res.PostAudit.VirtualPocCount, "incompletePocs": res.PostAudit.IncompletePocCount})
 	}
 	return res, nil
+}
+
+func (a *App) RestoreExternalCapabilityBackup(req RestoreExternalCapabilityBackupRequest) (*RestoreExternalCapabilityBackupResult, error) {
+	if !req.Confirm || strings.TrimSpace(req.Confirmation) != "RESTORE_EXTERNAL_CAPABILITY" {
+		return nil, fmt.Errorf("需要显式确认 RESTORE_EXTERNAL_CAPABILITY")
+	}
+	root := strings.TrimSpace(req.ProjectRoot)
+	if root == "" {
+		return nil, fmt.Errorf("dddd 根目录为空")
+	}
+	start := time.Now()
+	fingerPath := filepath.Join(root, "common", "config", "finger.yaml")
+	workflowPath := filepath.Join(root, "common", "config", "workflow.yaml")
+	res := &RestoreExternalCapabilityBackupResult{}
+	if strings.TrimSpace(req.FingerBackupPath) != "" {
+		currentBackup, err := restoreConfigBackup(req.FingerBackupPath, fingerPath, start)
+		if err != nil {
+			return nil, err
+		}
+		res.RestoredFinger = true
+		res.FingerCurrentBackupPath = currentBackup
+	}
+	if strings.TrimSpace(req.WorkflowBackupPath) != "" {
+		currentBackup, err := restoreConfigBackup(req.WorkflowBackupPath, workflowPath, start)
+		if err != nil {
+			return nil, err
+		}
+		res.RestoredWorkflow = true
+		res.WorkflowCurrentBackupPath = currentBackup
+	}
+	if !res.RestoredFinger && !res.RestoredWorkflow {
+		return nil, fmt.Errorf("没有可恢复的备份文件")
+	}
+	logPath := filepath.Join(root, "Doperationtool-merge-"+start.Format("20060102")+".jsonl")
+	appendReviewLog(logPath, "restore_external_capability_backup", map[string]any{"finger": res.RestoredFinger, "workflow": res.RestoredWorkflow, "fingerCurrentBackup": res.FingerCurrentBackupPath, "workflowCurrentBackup": res.WorkflowCurrentBackupPath})
+	res.LogPath = logPath
+	return res, nil
+}
+
+func restoreConfigBackup(backupPath, targetPath string, start time.Time) (string, error) {
+	backupAbs, err := filepath.Abs(strings.TrimSpace(backupPath))
+	if err != nil {
+		return "", err
+	}
+	targetAbs, err := filepath.Abs(targetPath)
+	if err != nil {
+		return "", err
+	}
+	if err := validateConfigBackupPath(backupAbs, targetAbs); err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(backupAbs); err != nil {
+		return "", fmt.Errorf("备份文件不可用 %s: %v", backupAbs, err)
+	}
+	if _, err := os.Stat(targetAbs); err != nil {
+		return "", fmt.Errorf("当前配置文件不可用 %s: %v", targetAbs, err)
+	}
+	currentBackup := targetAbs + ".restore-" + start.Format("20060102-150405") + ".bak"
+	if err := copyFile(targetAbs, currentBackup); err != nil {
+		return "", fmt.Errorf("备份当前配置失败 %s: %v", targetAbs, err)
+	}
+	if err := copyFile(backupAbs, targetAbs); err != nil {
+		return "", fmt.Errorf("恢复备份失败 %s -> %s: %v", backupAbs, targetAbs, err)
+	}
+	return currentBackup, nil
+}
+
+func validateConfigBackupPath(backupAbs, targetAbs string) error {
+	if filepath.Dir(backupAbs) != filepath.Dir(targetAbs) {
+		return fmt.Errorf("备份文件必须位于目标配置同目录: %s", backupAbs)
+	}
+	backupBase := filepath.Base(backupAbs)
+	targetBase := filepath.Base(targetAbs)
+	if !strings.HasPrefix(backupBase, targetBase+".") || !strings.HasSuffix(backupBase, ".bak") {
+		return fmt.Errorf("备份文件名不符合预期: %s", backupBase)
+	}
+	return nil
 }
 
 func planExternalPocCopies(root string, pocs []ExternalPocNewItem) []ExternalPocPlan {

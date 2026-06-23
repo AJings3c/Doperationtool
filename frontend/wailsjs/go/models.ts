@@ -232,6 +232,46 @@ export namespace main {
 	        this.elapsed = source["elapsed"];
 	    }
 	}
+	export class RestoreExternalCapabilityBackupRequest {
+	    projectRoot: string;
+	    fingerBackupPath: string;
+	    workflowBackupPath: string;
+	    confirm: boolean;
+	    confirmation: string;
+
+	    static createFrom(source: any = {}) {
+	        return new RestoreExternalCapabilityBackupRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.fingerBackupPath = source["fingerBackupPath"];
+	        this.workflowBackupPath = source["workflowBackupPath"];
+	        this.confirm = source["confirm"];
+	        this.confirmation = source["confirmation"];
+	    }
+	}
+	export class RestoreExternalCapabilityBackupResult {
+	    restoredFinger: boolean;
+	    restoredWorkflow: boolean;
+	    fingerCurrentBackupPath: string;
+	    workflowCurrentBackupPath: string;
+	    logPath: string;
+
+	    static createFrom(source: any = {}) {
+	        return new RestoreExternalCapabilityBackupResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.restoredFinger = source["restoredFinger"];
+	        this.restoredWorkflow = source["restoredWorkflow"];
+	        this.fingerCurrentBackupPath = source["fingerCurrentBackupPath"];
+	        this.workflowCurrentBackupPath = source["workflowCurrentBackupPath"];
+	        this.logPath = source["logPath"];
+	    }
+	}
 	export class ApplyExternalCapabilityResult {
 	    fingerBackupPath: string;
 	    workflowBackupPath: string;

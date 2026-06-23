@@ -2580,6 +2580,18 @@ a {
     border-color: rgba(248, 81, 73, 0.45);
     background: rgba(248, 81, 73, 0.08);
 }
+.fg-restore-box {
+    display: grid;
+    gap: 8px;
+    border: 1px solid rgba(240, 136, 62, 0.38);
+    background: rgba(240, 136, 62, 0.08);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 8px;
+}
+.fg-restore-title {
+    color: var(--text-2);
+}
 .ec-select-toolbar {
     display: flex;
     gap: 6px;

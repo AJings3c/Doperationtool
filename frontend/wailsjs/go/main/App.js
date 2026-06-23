@@ -90,6 +90,10 @@ export function RevealInFileManager(arg1) {
   return window['go']['main']['App']['RevealInFileManager'](arg1);
 }
 
+export function RestoreExternalCapabilityBackup(arg1) {
+  return window['go']['main']['App']['RestoreExternalCapabilityBackup'](arg1);
+}
+
 export function SaveExternalFingerprintReview(arg1) {
   return window['go']['main']['App']['SaveExternalFingerprintReview'](arg1);
 }

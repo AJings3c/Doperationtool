@@ -109,4 +109,38 @@ func TestExternalCapabilityUsesDDDDCommonConfigPocs(t *testing.T) {
 	if got := string(fingerRaw); !strings.Contains(got, `body="Alpha New"`) || !strings.Contains(got, "Beta:") {
 		t.Fatalf("finger.yaml did not include merged rules:\n%s", got)
 	}
+
+	restore, err := app.RestoreExternalCapabilityBackup(RestoreExternalCapabilityBackupRequest{
+		ProjectRoot:        root,
+		FingerBackupPath:   apply.FingerBackupPath,
+		WorkflowBackupPath: apply.WorkflowBackupPath,
+		Confirm:            true,
+		Confirmation:       "RESTORE_EXTERNAL_CAPABILITY",
+	})
+	if err != nil {
+		t.Fatalf("RestoreExternalCapabilityBackup returned error: %v", err)
+	}
+	if !restore.RestoredFinger || !restore.RestoredWorkflow {
+		t.Fatalf("restore result = %#v", restore)
+	}
+	if _, err := os.Stat(restore.FingerCurrentBackupPath); err != nil {
+		t.Fatalf("expected current finger backup before restore: %v", err)
+	}
+	if _, err := os.Stat(restore.WorkflowCurrentBackupPath); err != nil {
+		t.Fatalf("expected current workflow backup before restore: %v", err)
+	}
+	fingerRaw, err = os.ReadFile(filepath.Join(cfgDir, "finger.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(fingerRaw); strings.Contains(got, "Beta:") || strings.Contains(got, `body="Alpha New"`) {
+		t.Fatalf("finger.yaml was not restored to pre-apply backup:\n%s", got)
+	}
+	workflowRaw, err = os.ReadFile(filepath.Join(cfgDir, "workflow.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(workflowRaw); strings.Contains(got, "Beta:") || strings.Contains(got, "new-poc-2") {
+		t.Fatalf("workflow.yaml was not restored to pre-apply backup:\n%s", got)
+	}
 }
