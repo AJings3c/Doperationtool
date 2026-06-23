@@ -2,6 +2,19 @@ import './style.css';
 import logoLight from './assets/images/logo-light.png';
 import logoDark from './assets/images/logo-dark.png';
 import {
+    buildExternalCapabilitySelection as buildExternalCapabilitySelectionState,
+    createFingerprintReviewState,
+    fingerprintReviewItemKey,
+    isExternalFingerSelected as isExternalFingerSelectedState,
+    isExternalPocSelected as isExternalPocSelectedState,
+    rebuildFingerprintReviewState,
+    renderExternalFingerYaml,
+    selectedExternalCapability as selectedExternalCapabilityState,
+    selectedPocPlan as selectedPocPlanState,
+    toggleExternalCapabilitySelectionState,
+    updateExternalCapabilitySelectionState,
+} from './externalReviewState.js';
+import {
     ApplyTemplateCategories,
     ApplyYamlCollection,
     ApplyFingerprintImport,
@@ -5758,44 +5771,6 @@ function renderPocDuplicateTable(title, total, items) {
     return renderFingerprintSection(title, total || 0, body, list.length);
 }
 
-function createFingerprintReviewState(preview) {
-    const items = (preview && preview.items || []).map((x) => ({ ...x }));
-    const state = {
-        ...preview,
-        allItems: items,
-        removedKeys: new Set(),
-        removedItems: [],
-        removed: [],
-    };
-    return rebuildFingerprintReviewState(state);
-}
-
-function fingerprintReviewItemKey(itemOrProduct, relPath) {
-    if (typeof itemOrProduct === 'object') {
-        return `${itemOrProduct.product || ''}\u0000${itemOrProduct.relPath || itemOrProduct.path || ''}`;
-    }
-    return `${itemOrProduct || ''}\u0000${relPath || ''}`;
-}
-
-function rebuildFingerprintReviewState(state) {
-    const active = (state.allItems || []).filter((x) => !state.removedKeys.has(fingerprintReviewItemKey(x)));
-    const removedItems = (state.allItems || []).filter((x) => state.removedKeys.has(fingerprintReviewItemKey(x)));
-    state.items = active;
-    state.removedItems = removedItems;
-    state.removed = removedItems.map((x) => ({
-        path: x.path || '',
-        relPath: x.relPath || x.product || '',
-        reason: '人工从本次指纹审核移除',
-    }));
-    state.ddddYaml = renderFingerprintReviewYaml(active);
-    state.candidateCount = active.length;
-    state.productCount = active.length;
-    state.ruleCount = active.reduce((n, x) => n + ((x.rules || []).length), 0);
-    state.highConfidenceCount = active.filter((x) => x.quality === 'high').length;
-    state.genericRuleCount = active.reduce((n, x) => n + ((x.rules || []).filter((rule) => rule && rule.generic).length), 0);
-    return state;
-}
-
 function removeFingerprintReviewItem(product, relPath) {
     if (!lastFingerprintReview) return;
     const key = fingerprintReviewItemKey(product, relPath);
@@ -5810,15 +5785,6 @@ function restoreFingerprintReviewItem(product, relPath) {
     lastFingerprintReview.removedKeys.delete(key);
     rebuildFingerprintReviewState(lastFingerprintReview);
     toast(`已恢复到本次指纹审核: ${product || relPath}`, 'success');
-}
-
-function renderFingerprintReviewYaml(items) {
-    const list = (items || []).filter((x) => x && x.product && (x.rules || []).length);
-    if (!list.length) return '';
-    return list.map((item) => [
-        `${yamlSingleQuote(item.product)}:`,
-        ...(item.rules || []).map((rule) => `  - ${yamlSingleQuote(rule.expression || rule.original || '')}`),
-    ].join('\n')).join('\n\n') + '\n';
 }
 
 function renderFingerprintImportPreview(r, elSummary, elResult) {
@@ -6374,56 +6340,36 @@ function renderExternalCapabilityPlanTable(title, plans) {
 }
 
 function buildExternalCapabilitySelection(r) {
-    return {
-        fingerProducts: new Set((r.newFingers || []).map((x) => x.product || '').filter(Boolean)),
-        pocPaths: new Set((r.newPocs || []).map((x) => x.path || '').filter(Boolean)),
-    };
+    return buildExternalCapabilitySelectionState(r);
 }
 
 function isExternalFingerSelected(product) {
-    return !!(lastCapabilitySelection && lastCapabilitySelection.fingerProducts && lastCapabilitySelection.fingerProducts.has(product || ''));
+    return isExternalFingerSelectedState(lastCapabilitySelection, product);
 }
 
 function isExternalPocSelected(path) {
-    return !!(lastCapabilitySelection && lastCapabilitySelection.pocPaths && lastCapabilitySelection.pocPaths.has(path || ''));
+    return isExternalPocSelectedState(lastCapabilitySelection, path);
 }
 
 function updateExternalCapabilitySelection(check) {
-    if (!lastCapabilitySelection) lastCapabilitySelection = { fingerProducts: new Set(), pocPaths: new Set() };
+    lastCapabilitySelection = updateExternalCapabilitySelectionState(lastCapabilitySelection, check.dataset.kind, check.dataset.key || '', check.checked);
     lastCapabilityApplyResult = null;
-    const set = check.dataset.kind === 'finger' ? lastCapabilitySelection.fingerProducts : lastCapabilitySelection.pocPaths;
-    const key = check.dataset.key || '';
-    if (!key) return;
-    if (check.checked) set.add(key);
-    else set.delete(key);
 }
 
 function toggleExternalCapabilitySelection(kind, checked) {
     if (!lastCapabilityScan) return;
-    if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(lastCapabilityScan);
+    lastCapabilitySelection = toggleExternalCapabilitySelectionState(lastCapabilityScan, lastCapabilitySelection, kind, checked);
     lastCapabilityApplyResult = null;
-    if (kind === 'finger') {
-        lastCapabilitySelection.fingerProducts = checked
-            ? new Set((lastCapabilityScan.newFingers || []).map((x) => x.product || '').filter(Boolean))
-            : new Set();
-    } else if (kind === 'poc') {
-        lastCapabilitySelection.pocPaths = checked
-            ? new Set((lastCapabilityScan.newPocs || []).map((x) => x.path || '').filter(Boolean))
-            : new Set();
-    }
 }
 
 function selectedExternalCapability(r) {
     if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(r);
-    return {
-        fingers: (r.newFingers || []).filter((x) => isExternalFingerSelected(x.product)),
-        pocs: (r.newPocs || []).filter((x) => isExternalPocSelected(x.path)),
-    };
+    return selectedExternalCapabilityState(r, lastCapabilitySelection);
 }
 
 function selectedPocPlan(r) {
     if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(r);
-    return (r.pocApplyPlan || []).filter((x) => isExternalPocSelected(x.sourcePath));
+    return selectedPocPlanState(r, lastCapabilitySelection);
 }
 
 function renderExternalCapabilitySelectionToolbar(kind) {
@@ -6432,19 +6378,6 @@ function renderExternalCapabilitySelectionToolbar(kind) {
             <button class="fg-copy-object ec-toggle-all" data-kind="${escapeHtml(kind)}" data-checked="true">全选</button>
             <button class="fg-copy-object ec-toggle-all" data-kind="${escapeHtml(kind)}" data-checked="false">全不选</button>
         </div>`;
-}
-
-function renderExternalFingerYaml(fingers) {
-    const list = (fingers || []).filter((x) => x && x.product && (x.rules || []).length);
-    if (!list.length) return '';
-    return list.map((entry) => [
-        `${yamlSingleQuote(entry.product)}:`,
-        ...(entry.rules || []).map((rule) => `  - ${yamlSingleQuote(rule)}`),
-    ].join('\n')).join('\n\n') + '\n';
-}
-
-function yamlSingleQuote(s) {
-    return `'${String(s || '').replace(/'/g, "''")}'`;
 }
 
 function renderExternalCapabilityPostAudit(audit, err) {
