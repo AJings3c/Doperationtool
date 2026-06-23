@@ -4758,6 +4758,17 @@ let lastCapabilityScan = null;
 let lastCapabilitySelection = null;
 let lastCapabilityApplyResult = null;
 
+function clearFingerprintReviewRuntime() {
+    lastFingerprintImportPreview = null;
+    lastFingerprintReview = null;
+}
+
+function clearExternalCapabilityRuntime() {
+    lastCapabilityScan = null;
+    lastCapabilitySelection = null;
+    lastCapabilityApplyResult = null;
+}
+
 function fingerShortPath(p) {
     const parts = String(p || '').split(/[\\/]+/).filter(Boolean);
     if (parts.length <= 2) return p;
@@ -5048,6 +5059,7 @@ function setupDDDDFingerprintConverter() {
         elSummary.innerHTML = '';
         elResult.innerHTML = `<div class="yaml-empty">正在解析 ${escapeHtml(sourceDir)} 并转换为 finger.yaml 指纹表达式…</div>`;
         progressTracker.start('fingerprint:import:progress', '外部指纹导入预览');
+        clearFingerprintReviewRuntime();
         try {
             const r = await PreviewFingerprintImport(root, sourceDir);
             lastFingerprintImportPreview = r;
@@ -6185,6 +6197,7 @@ function setupExternalCapability() {
         elResult.innerHTML = `<div class="yaml-empty">正在严格对比新增指纹和 POC…</div>`;
         elSummary.innerHTML = '';
         progressTracker.start('fingerprint:external_capability:progress', '新增能力严格对比');
+        clearExternalCapabilityRuntime();
         try {
             const r = await ScanExternalCapability(root, pocDir, fingerDir);
             lastCapabilityScan = r;
@@ -6377,6 +6390,7 @@ function isExternalPocSelected(path) {
 
 function updateExternalCapabilitySelection(check) {
     if (!lastCapabilitySelection) lastCapabilitySelection = { fingerProducts: new Set(), pocPaths: new Set() };
+    lastCapabilityApplyResult = null;
     const set = check.dataset.kind === 'finger' ? lastCapabilitySelection.fingerProducts : lastCapabilitySelection.pocPaths;
     const key = check.dataset.key || '';
     if (!key) return;
@@ -6387,6 +6401,7 @@ function updateExternalCapabilitySelection(check) {
 function toggleExternalCapabilitySelection(kind, checked) {
     if (!lastCapabilityScan) return;
     if (!lastCapabilitySelection) lastCapabilitySelection = buildExternalCapabilitySelection(lastCapabilityScan);
+    lastCapabilityApplyResult = null;
     if (kind === 'finger') {
         lastCapabilitySelection.fingerProducts = checked
             ? new Set((lastCapabilityScan.newFingers || []).map((x) => x.product || '').filter(Boolean))
