@@ -6184,6 +6184,7 @@ function setupExternalCapability() {
         elScan.disabled = true;
         elResult.innerHTML = `<div class="yaml-empty">正在严格对比新增指纹和 POC…</div>`;
         elSummary.innerHTML = '';
+        progressTracker.start('fingerprint:external_capability:progress', '新增能力严格对比');
         try {
             const r = await ScanExternalCapability(root, pocDir, fingerDir);
             lastCapabilityScan = r;
@@ -6198,6 +6199,7 @@ function setupExternalCapability() {
             elResult.innerHTML = `<div class="poc-validate-fail">❌ 对比失败: ${escapeHtml(err)}</div>`;
             toast(String(err), 'error');
         } finally {
+            progressTracker.stop();
             elScan.disabled = false;
         }
     }

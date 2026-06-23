@@ -252,13 +252,25 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 	}
 	fingerPath := filepath.Join(root, "common", "config", "finger.yaml")
 	pocDir := filepath.Join(root, "common", "config", "pocs")
-	existingFingers, err := loadFingerEntries(context.Background(), fingerPath)
+	ctx, pe, cleanup := a.beginTask("fingerprint:external_capability:progress", "scanning", 0)
+	defer cleanup()
+	defer pe.finish("新增能力对比完成")
+
+	pe.forceEmit(0, "读取 dddd finger.yaml")
+	existingFingers, err := loadFingerEntries(ctx, fingerPath)
 	if err != nil {
 		return nil, err
 	}
-	existingPocs, err := scanFingerprintPocs(context.Background(), nil, pocDir)
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("已取消")
+	}
+	pe.forceEmit(0, "扫描 dddd POC")
+	existingPocs, err := scanFingerprintPocs(ctx, pe, pocDir)
 	if err != nil {
 		return nil, err
+	}
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("已取消")
 	}
 	res := &ExternalCapabilityScanResult{
 		ProjectRoot:     root,
@@ -268,10 +280,15 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 		NewPocs:         []ExternalPocNewItem{},
 	}
 	if res.FingerReviewDir != "" {
+		pe.forceEmit(0, "读取已审核指纹")
 		imported, err := loadReviewedFingerEntries(res.FingerReviewDir)
 		if err != nil {
 			return nil, err
 		}
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("已取消")
+		}
+		pe.forceEmit(0, "对比新增指纹规则")
 		diff := diffFingerEntries(existingFingers, imported)
 		for _, entry := range diff {
 			res.NewFingers = append(res.NewFingers, fingerEntryView{Product: entry.Product, Rules: entry.Rules})
@@ -281,16 +298,27 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 		res.NewFingerYaml = renderFingerEntriesYAML(diff)
 	}
 	if res.PocReviewDir != "" {
+		pe.forceEmit(0, "读取已审核 POC")
 		review, err := loadReviewedPocs(res.PocReviewDir)
 		if err != nil {
 			return nil, err
 		}
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("已取消")
+		}
+		pe.switchPhase("analyzing", len(review.Items))
+		pe.forceEmit(0, fmt.Sprintf("对比 %d 个审核 POC", len(review.Items)))
 		existingKeys := pocKeySet(existingPocs)
-		for _, p := range review.Items {
+		for i, p := range review.Items {
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("已取消")
+			}
 			if p.Duplicate {
+				pe.tick(i+1, fmt.Sprintf("跳过重复 POC %d/%d", i+1, len(review.Items)))
 				continue
 			}
 			if pocExistsInSet(p, existingKeys) {
+				pe.tick(i+1, fmt.Sprintf("跳过已存在 POC %d/%d", i+1, len(review.Items)))
 				continue
 			}
 			res.NewPocs = append(res.NewPocs, ExternalPocNewItem{
@@ -304,6 +332,7 @@ func (a *App) ScanExternalCapability(projectRoot, pocReviewDir, fingerReviewDir 
 				ContentHash:     p.ContentHash,
 				Duplicate:       p.Duplicate,
 			})
+			pe.tick(i+1, fmt.Sprintf("对比审核 POC %d/%d", i+1, len(review.Items)))
 		}
 		sort.Slice(res.NewPocs, func(i, j int) bool { return res.NewPocs[i].RelPath < res.NewPocs[j].RelPath })
 		res.NewPocCount = len(res.NewPocs)
