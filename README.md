@@ -1,20 +1,25 @@
 # Doperationtool
 
-Doperationtool 是一款面向 dddd 项目的本地能力库运维工具，用于维护 `finger.yaml`、`dir.yaml`、`workflow.yaml` 三文件识别链路，以及外部指纹、接口路径和 POC 能力接入流程。
+Doperationtool 是一款面向 dddd 项目的本地能力库维护工具，直接维护并审计四类相互关联的能力资产：`finger`、`dir`、`workflow` 和 `pocs`。
 
-它把 dddd 日常运维中的指纹审计、外部指纹导入、外部 POC 归类、能力差异对比、审核留痕、写入备份和回滚入口放进一个本地桌面应用里，尽量减少在脚本、编辑器和文件管理器之间反复切换。
+它把 dddd 日常运维中的识别入口审计、Workflow/POC 关联检查、外部指纹与 POC 归类、能力差异对比、审核留痕、写入备份和回滚入口放进一个本地桌面应用里，尽量减少在脚本、编辑器和文件管理器之间反复切换。
 
-YAML、Nuclei、POC 批处理能力是服务 dddd 运维流程的支撑工具，不是本项目的主定位。
+四类资产的关系是：`finger.yaml` 和 `dir.yaml` 提供识别入口，`workflow.yaml` 把识别出的产品与验证流程连接起来，`common/config/pocs` 提供被 Workflow 调用的实际 POC。工具会沿这条关系链进行审计、归类、审核和选择性写回。
+
+YAML、Nuclei 以及 POC 转换/批处理是围绕这条四类资产维护链路提供的辅助入口，不等同于核心定位。
 
 ## 功能概览
 
-### dddd 能力库运维
+### 四类核心资产维护
 
-- 审计 `common/config/finger.yaml`、`common/config/dir.yaml`、`workflow.yaml` 和 `common/config/pocs` 的关联关系。
+- 审计 `common/config/finger.yaml`、`common/config/dir.yaml`、`common/config/workflow.yaml` 和 `common/config/pocs` 的关联关系。
 - 识别入口按 `finger.yaml ∪ dir.yaml` 判断，workflow 只作为识别后的 POC 联动层。
-- 识别识别入口无 workflow、workflow 无识别入口、POC 未被 workflow 调用、workflow 引用缺失 POC、残缺 POC 等问题。
+- 按 POC 的 `id`、`info.name` 和文件名与 finger/dir 产品匹配，并解析 `workflow.pocs` 的实际引用。
+- 识别入口无 workflow、workflow 无识别入口、POC 未被 workflow 调用、workflow 引用缺失 POC、残缺 POC 等问题。
 - 对审计问题按风险优先级展示，并支持定位文件、复制对象名等辅助操作。
 - 产出面向运维处理的修复建议，帮助判断是补指纹、补 workflow、补 POC，还是保留为资产识别类能力。
+
+当前写入路径以“预览/审核/选择性接入/备份回滚”为主，不是一个允许任意修改 YAML 或 POC 文本的通用编辑器。
 
 ### 外部能力接入
 

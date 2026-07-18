@@ -7,8 +7,8 @@ The frontend is a Vite-powered, framework-free ES module application embedded by
 - `src/main.js` is the bootstrap only. It mounts the shell, registers routes, and connects navigation lifecycle cleanup.
 - `src/app/` owns the application shell, navigation bridge, and router.
 - `src/core/` contains shared infrastructure such as progress events, feedback overlays, formatting, and route scopes.
-- `src/features/capability/` owns the four active dddd workflows. Each route has its own module; shared review state and result renderers stay inside the feature boundary.
-- `src/features/legacy/` preserves the previous YAML, Nuclei, and POC support tools. These tools are intentionally not registered in the current navigation and are excluded from the active bundle.
+- `src/features/capability/` owns the four active dddd workflows, including the `finger`/`dir`/`workflow`/`pocs` relationship audit and selective capability intake. Each route has its own module; shared review state and result renderers stay inside the feature boundary.
+- `src/features/legacy/` preserves the previous YAML, Nuclei, and POC conversion/batch tools. These auxiliary tools are intentionally not registered in the current navigation and are excluded from the active bundle; core POC governance remains in `src/features/capability/`.
 - `src/styles/` separates foundations, shell, shared controls, feedback, and active capability styles. `src/style.css` is the ordered active-bundle manifest.
 - `src/styles/legacy.css` is the optional extension manifest for the preserved support tools. Load it after `src/style.css` only when those routes are registered.
 
