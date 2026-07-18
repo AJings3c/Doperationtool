@@ -79,12 +79,14 @@ go test ./...
 
 ```bash
 cd frontend
+npm.cmd test
 npm.cmd run build
 ```
 
 在非 Windows shell 中也可以使用：
 
 ```bash
+npm test
 npm run build
 ```
 
@@ -100,9 +102,16 @@ Doperationtool/
 ├── external_capability.go          # 外部指纹/接口路径/POC 审核结果对比并接入 dddd
 ├── nuclei*.go                      # 支撑 dddd 运维的 Nuclei 模板校验、去重、分类、收集、修复
 ├── pocconvert.go                   # 支撑 dddd 运维的 POC 转换
+├── PRODUCT.md                      # 产品定位、设计原则与无障碍基线
 ├── frontend/
-│   ├── src/main.js                 # 前端 UI、模块路由与事件绑定
-│   ├── src/style.css               # 应用样式
+│   ├── src/main.js                 # 轻量启动入口与路由注册
+│   ├── src/app/                    # 应用壳、导航与路由生命周期
+│   ├── src/core/                   # 进度、反馈、格式化等共享基础设施
+│   ├── src/features/capability/    # 四个 dddd 运维业务模块及共享状态/视图
+│   ├── src/features/legacy/        # 暂未注册路由的 YAML、Nuclei、POC 辅助工具
+│   ├── src/styles/                 # 按职责拆分且保持级联顺序的样式
+│   ├── test/                       # Node 原生前端特征测试
+│   ├── ARCHITECTURE.md             # 前端模块边界与路由约定
 │   └── wailsjs/                    # Wails 自动生成的前端绑定
 ├── build/                          # 构建配置与输出目录
 └── wails.json                      # Wails 项目配置

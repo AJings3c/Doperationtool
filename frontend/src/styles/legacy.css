@@ -1,0 +1,6 @@
+/* Optional extension manifest for the preserved, currently unregistered tools. */
+@import './yaml-workbench.css';
+@import './validation.css';
+@import './template-tools.css';
+@import './compat.css';
+@import './yaml-browser.css';

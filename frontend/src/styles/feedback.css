@@ -1,0 +1,289 @@
+/* ===== Toast ===== */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    color: var(--text-1);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    transform: translateY(8px) scale(0.98);
+    opacity: 0;
+    transform-origin: bottom right;
+    transition:
+        transform var(--motion-standard) var(--motion-ease-out-quint),
+        opacity var(--motion-standard) var(--motion-ease-out-quart),
+        background-color var(--motion-slow) var(--motion-ease-out-quart),
+        border-color var(--motion-slow) var(--motion-ease-out-quart),
+        color var(--motion-slow) var(--motion-ease-out-quart);
+    pointer-events: none;
+    z-index: 100;
+    max-width: 360px;
+}
+
+.toast.show {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.toast.success { border-color: var(--success); }
+.toast.error   { border-color: var(--danger); }
+.toast.info    { border-color: var(--accent); }
+.toast.warn    { border-color: #d29922; } /* 黄, 用于"部分成功带跳过"的状态 */
+
+/* ===== 全局长任务进度卡片 (右下角浮动) =====
+   后端 dedup / autofix / validator 跑 5-30s 时显示, 给百分比 + N/total + elapsed.
+   位置在 toast 上方 (toast 80px), 不打架. */
+.global-progress {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-color: var(--accent, #58a6ff);
+    border-radius: 6px;
+    padding: 10px 14px;
+    width: 320px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    font-size: 12px;
+    color: var(--text-1);
+    --wails-draggable: no-drag;
+    transform-origin: bottom right;
+    animation: feedback-materialize var(--motion-slow) var(--motion-ease-out-quint) backwards;
+    transition:
+        background-color var(--motion-slow) var(--motion-ease-out-quart),
+        border-color var(--motion-slow) var(--motion-ease-out-quart),
+        color var(--motion-slow) var(--motion-ease-out-quart);
+}
+.global-progress[hidden] { display: none; }
+
+.gp-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.gp-title {
+    font-weight: 600;
+    color: var(--text-1);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.gp-elapsed {
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+/* 取消按钮: 头部右侧, 跟 toast 关闭按钮风格一致, 点 → 调 CancelCurrentTask. */
+.gp-cancel {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-2);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        color var(--motion-fast) var(--motion-ease-out-quart),
+        border-color var(--motion-fast) var(--motion-ease-out-quart),
+        background-color var(--motion-fast) var(--motion-ease-out-quart),
+        transform var(--motion-fast) var(--motion-ease-out-quart);
+    --wails-draggable: no-drag;
+}
+.gp-cancel:hover:not(:disabled) {
+    color: var(--danger, #f85149);
+    border-color: var(--danger, #f85149);
+    background: var(--bg-3);
+}
+.gp-cancel:disabled {
+    cursor: wait;
+    opacity: 0.5;
+}
+
+.gp-bar {
+    height: 6px;
+    background: var(--bg-3);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.gp-fill {
+    height: 100%;
+    background: var(--accent, #58a6ff);
+    transition: width var(--motion-standard) var(--motion-ease-out-quart);
+    width: 0%;
+}
+/* indeterminate: 不知道总数时走条纹滚动动画 */
+.gp-fill.indeterminate {
+    background: repeating-linear-gradient(
+        135deg,
+        var(--accent, #58a6ff) 0 10px,
+        rgba(88, 166, 255, 0.6) 10px 20px
+    );
+    background-size: 28px 28px;
+    animation: gp-stripe-move 1.2s linear infinite;
+}
+.gp-fill.done {
+    background: var(--success, #2ea043);
+    transition:
+        width var(--motion-slow) var(--motion-ease-out-quart),
+        background-color var(--motion-slow) var(--motion-ease-out-quart);
+}
+/* 取消后的视觉: 橙红色 (跟 done 区分, 跟 danger 区分; 取消不算"失败") */
+.gp-fill.cancelled {
+    background: #d29922;
+    transition:
+        width var(--motion-slow) var(--motion-ease-out-quart),
+        background-color var(--motion-slow) var(--motion-ease-out-quart);
+    animation: none;
+}
+@keyframes gp-stripe-move {
+    0%   { background-position: 0 0; }
+    100% { background-position: 28px 0; }
+}
+
+@keyframes feedback-materialize {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.gp-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--text-2);
+    font-size: 11px;
+    font-family: var(--font-mono);
+}
+.gp-phase {
+    color: var(--accent, #58a6ff);
+    flex-shrink: 0;
+}
+.gp-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    flex: 1;
+    min-width: 0;
+}
+
+/* ===== Context Menu (右键菜单) ===== */
+.context-menu {
+    position: fixed;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 0;
+    min-width: 200px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    font-size: 12px;
+    user-select: none;
+    -webkit-user-select: none;
+    --wails-draggable: no-drag;
+}
+
+.context-menu-item {
+    padding: 6px 14px;
+    cursor: pointer;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.context-menu-item:hover {
+    background: var(--bg-3);
+}
+
+.context-menu-item.danger {
+    color: var(--danger);
+}
+
+.context-menu-item.danger:hover {
+    background: rgba(248, 81, 73, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast,
+    .toast.show,
+    .global-progress {
+        transform: none;
+        animation: none;
+    }
+
+    .gp-fill.indeterminate {
+        animation: none;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .toast,
+    .global-progress,
+    .context-menu {
+        background-color: var(--bg-2);
+        box-shadow: none;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+@media (prefers-contrast: more) {
+    .toast,
+    .global-progress,
+    .context-menu {
+        outline: 1px solid var(--text-1);
+        outline-offset: -1px;
+    }
+
+    .gp-cancel {
+        border-color: var(--text-2);
+    }
+}
+
+.context-menu-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 6px;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border);
+}

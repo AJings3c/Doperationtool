@@ -1,0 +1,452 @@
+/* ============================================
+ * 文件树视图 (源面板)
+ * ============================================ */
+
+.yaml-tree {
+    padding: 4px 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.tree-folder {
+    display: block;
+}
+
+.tree-folder-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 6px;
+    font-size: 12px;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background-color 0.1s ease, color 0.1s ease;
+    --wails-draggable: no-drag;
+}
+
+.tree-folder-header:hover {
+    background: var(--bg-2);
+    color: var(--text-1);
+}
+
+.tree-chevron {
+    font-size: 9px;
+    color: var(--text-3);
+    width: 10px;
+    text-align: center;
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* 展开状态下小三角向下指 */
+.tree-folder:not(.collapsed) > .tree-folder-header > .tree-chevron {
+    transform: rotate(90deg);
+}
+
+.tree-folder.collapsed > .tree-folder-body {
+    display: none;
+}
+
+.tree-folder-icon {
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.tree-folder-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+}
+
+.tree-folder-count {
+    font-size: 10px;
+    color: var(--text-3);
+    background: var(--bg-3);
+    padding: 0 6px;
+    border-radius: 8px;
+    min-width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* 文件叶子节点: 复用 .yaml-list-item 的 hover/active 配色, 但 padding 由 inline style 控制层级 */
+.tree-file {
+    /* 用 padding-left 通过 inline style 注入, 这里只做基础布局 */
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-right: 10px;
+}
+
+.tree-file-icon {
+    font-size: 11px;
+    opacity: 0.85;
+    flex-shrink: 0;
+}
+
+/* 文件行复选框: 自定义样式, 让它在暗色背景下清晰可见 */
+.file-check {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    margin: 0 2px 0 0;
+    border: 1px solid var(--text-3);
+    border-radius: 3px;
+    background: var(--bg-0);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.12s ease;
+    --wails-draggable: no-drag;
+}
+
+.file-check:hover {
+    border-color: var(--accent);
+}
+
+.file-check:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.file-check:checked::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 0;
+    width: 4px;
+    height: 7px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* 已勾选的文件行: 整行加一层蓝色调底, 让一眼就能看出哪些会被同步 */
+.tree-file.selected {
+    background: rgba(88, 166, 255, 0.10);
+}
+.tree-file.selected:hover {
+    background: rgba(88, 166, 255, 0.18);
+}
+.tree-file.selected.active {
+    background: rgba(88, 166, 255, 0.20);
+}
+
+/* ============================================
+ * 源面板: 视图切换条 (目录树 / 按类归纳) + 全部展开/折叠
+ * ============================================ */
+
+.yaml-view-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.yaml-view-tabs {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+}
+
+.yaml-view-tab {
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text-2);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    font-family: var(--font-sans);
+    --wails-draggable: no-drag;
+}
+
+.yaml-view-tab:hover {
+    color: var(--text-1);
+    border-color: var(--text-3);
+}
+
+.yaml-view-tab.active {
+    color: var(--accent);
+    background: rgba(88, 166, 255, 0.12);
+    border-color: var(--accent);
+}
+
+.yaml-view-actions {
+    display: flex;
+    gap: 2px;
+}
+
+.yaml-view-action {
+    min-width: 26px;
+    height: 24px;
+    padding: 0 6px;        /* 给文字按钮留水平空隙, 纯图标按钮也不会变胖 */
+    font-size: 11px;       /* 包含中文 "全选 / 清空" 时 11px 比 14px 协调 */
+    line-height: 1;
+    color: var(--text-2);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+    --wails-draggable: no-drag;
+}
+
+.yaml-view-action:hover {
+    color: var(--text-1);
+    border-color: var(--text-3);
+    background: var(--bg-2);
+}
+
+/* view-bar 操作区里的小竖线分隔符 */
+.yaml-view-divider {
+    width: 1px;
+    height: 14px;
+    background: var(--border);
+    margin: 0 2px;
+    flex-shrink: 0;
+}
+
+/* ============================================
+ * 按类归纳视图
+ * ============================================ */
+
+.yaml-categories {
+    padding: 4px 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.yaml-cat-group {
+    margin-bottom: 2px;
+}
+
+.yaml-cat-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px 6px 8px;
+    font-size: 12px;
+    color: var(--text-1);
+    background: var(--bg-1);
+    border-left: 2px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+    --wails-draggable: no-drag;
+}
+
+.yaml-cat-header:hover {
+    background: var(--bg-2);
+}
+
+/* 展开态小三角转向下 */
+.yaml-cat-group:not(.collapsed) > .yaml-cat-header > .tree-chevron {
+    transform: rotate(90deg);
+}
+
+.yaml-cat-group.collapsed > .yaml-cat-body {
+    display: none;
+}
+
+.yaml-cat-icon {
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.yaml-cat-name {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yaml-cat-count {
+    font-size: 10px;
+    color: var(--text-3);
+    background: var(--bg-3);
+    padding: 1px 7px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* 待处理组: 橙色警告色 */
+.yaml-cat-pending > .yaml-cat-header {
+    color: #f0883e;
+    border-left-color: #f0883e;
+    background: rgba(240, 136, 62, 0.08);
+}
+
+.yaml-cat-pending > .yaml-cat-header:hover {
+    background: rgba(240, 136, 62, 0.16);
+}
+
+.yaml-cat-pending > .yaml-cat-header .yaml-cat-count {
+    background: rgba(240, 136, 62, 0.22);
+    color: #f0883e;
+}
+
+/* ============================================
+ * 严重级别色点 (nuclei poc 的 info.severity)
+ *   critical = 红 (有 glow), high = 橙, medium = 黄, low = 蓝, info = 灰
+ * ============================================ */
+.sev-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sev-critical {
+    background: #f85149;
+    box-shadow: 0 0 5px rgba(248, 81, 73, 0.7);
+}
+.sev-high   { background: #f0883e; }
+.sev-medium { background: #d29922; }
+.sev-low    { background: #58a6ff; }
+.sev-info   { background: #7d8590; }
+
+/* ============================================
+ * 源面板搜索栏
+ * ============================================ */
+
+.yaml-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.yaml-search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: var(--font-sans);
+    color: var(--text-1);
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.12s ease;
+    --wails-draggable: no-drag;
+}
+
+.yaml-search-input:focus {
+    border-color: var(--accent);
+}
+
+.yaml-search-input::placeholder {
+    color: var(--text-3);
+}
+
+/* webkit search 自带的清除按钮在暗色背景上很丑, 干掉, 我们用 ESC 清空 */
+.yaml-search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* 仅 nuclei toggle: 默认 active (蓝色边框), 关闭后转灰. 紫色小点视觉锚 */
+.yaml-filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    font-size: 11px;
+    color: var(--text-2);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.12s ease;
+    font-family: var(--font-sans);
+    --wails-draggable: no-drag;
+}
+
+.yaml-filter-toggle:hover {
+    color: var(--text-1);
+    border-color: var(--text-3);
+}
+
+.yaml-filter-toggle.active {
+    color: var(--accent);
+    background: rgba(88, 166, 255, 0.12);
+    border-color: var(--accent);
+}
+
+.nuclei-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-3);
+    transition: background 0.12s ease;
+}
+
+.yaml-filter-toggle.active .nuclei-dot {
+    background: #a371f7;     /* 类紫, nuclei 品牌色 */
+    box-shadow: 0 0 4px rgba(163, 113, 247, 0.6);
+}
+
+.yaml-search-count {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-3);
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+/* 0 个匹配时高亮提示 */
+.yaml-search-count.warn {
+    color: #f0883e;
+}
+
+/* 搜索激活时不管之前折叠状态如何, 一律强制展开, 不破坏用户原偏好 (退出搜索后还原) */
+.yaml-list[data-searching="true"] .tree-folder.collapsed > .tree-folder-body,
+.yaml-list[data-searching="true"] .yaml-cat-group.collapsed > .yaml-cat-body {
+    display: block;
+}
+
+.yaml-list[data-searching="true"] .tree-folder.collapsed > .tree-folder-header > .tree-chevron,
+.yaml-list[data-searching="true"] .yaml-cat-group.collapsed > .yaml-cat-header > .tree-chevron {
+    transform: rotate(90deg);
+}
+
+/* ============================================
+ * 加载中状态 (大目录扫描时)
+ * ============================================ */
+
+.yaml-loading {
+    padding: 32px 14px;
+    text-align: center;
+    color: var(--text-2);
+    font-size: 12px;
+    font-family: var(--font-mono);
+}
+
+.yaml-loading::before {
+    content: '⏳';
+    display: inline-block;
+    margin-right: 8px;
+    animation: yaml-loading-spin 1.4s linear infinite;
+}
+
+@keyframes yaml-loading-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}

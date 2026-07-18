@@ -1,0 +1,119 @@
+/* ============================================
+ * Doperationtool
+ * 暗色主题, 受 GitHub Dark / VS Code 启发
+ * ============================================ */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg-0: #0d1117;
+    --bg-1: #161b22;
+    --bg-2: #1c2128;
+    --bg-3: #2d333b;
+    --border: #30363d;
+    --text-1: #e6edf3;
+    --text-2: #b1bac4;
+    /* Keeps 11-12px muted text above 4.5:1 on every dark surface. */
+    --text-3: #9da7b1;
+    --accent: #58a6ff;
+    --accent-hover: #79b8ff;
+    --danger: #f85149;
+    --success: #3fb950;
+    --warning: #d29922;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "SF Mono", "Cascadia Code", Monaco, Menlo, Consolas,
+                 "Liberation Mono", "Courier New", monospace;
+    --motion-fast: 100ms;
+    --motion-standard: 180ms;
+    --motion-slow: 220ms;
+    --motion-ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --motion-ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme="light"] {
+    --bg-0: #f6f8fa;
+    --bg-1: #ffffff;
+    --bg-2: #f0f3f6;
+    --bg-3: #dbe4ee;
+    --border: #d0d7de;
+    --text-1: #24292f;
+    --text-2: #46515d;
+    /* Keeps 11-12px muted text above 4.5:1 on every light surface. */
+    --text-3: #57606a;
+    --accent: #0969da;
+    --accent-hover: #218bff;
+    --danger: #cf222e;
+    --success: #1a7f37;
+    --warning: #9a6700;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-0);
+    color: var(--text-1);
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: 0;
+    font-optical-sizing: auto;
+    transition:
+        background-color var(--motion-slow) var(--motion-ease-out-quart),
+        color var(--motion-slow) var(--motion-ease-out-quart);
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+input, textarea {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+input::placeholder,
+textarea::placeholder {
+    opacity: 1;
+}
+
+:where(button, input, textarea, select, a, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+:where(button, .btn):not(:disabled):active {
+    transform: scale(0.97);
+    transition: transform var(--motion-fast) var(--motion-ease-out-quart);
+}
+
+#app {
+    display: flex;
+    height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    :where(button, .btn):not(:disabled):active {
+        transform: none;
+    }
+}
+
+@media (prefers-contrast: more) {
+    :where(button, input, textarea, select, a, [tabindex]):focus-visible {
+        outline-width: 3px;
+    }
+}

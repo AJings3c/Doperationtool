@@ -1,0 +1,238 @@
+/* ============ Autofix 预览 modal ============ */
+.autofix-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 120ms ease-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.autofix-modal {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    width: 80%;
+    max-width: 920px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.autofix-modal-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-2);
+}
+.autofix-modal-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-1);
+}
+.autofix-modal-close {
+    background: transparent;
+    border: 0;
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 3px;
+}
+.autofix-modal-close:hover {
+    background: var(--bg-0);
+    color: var(--text-1);
+}
+.autofix-modal-body {
+    padding: 14px 16px;
+    overflow-y: auto;
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-1);
+}
+.autofix-summary {
+    background: var(--bg-2);
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    line-height: 1.7;
+}
+.autofix-summary code {
+    background: var(--bg-0);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 11px;
+}
+.autofix-warn { color: #ffb86c; }
+.autofix-note {
+    color: var(--text-2);
+    font-size: 11px;
+}
+.autofix-modal-body details {
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-2);
+}
+.autofix-modal-body details > summary {
+    cursor: pointer;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-1);
+    user-select: none;
+}
+.autofix-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 12px 12px;
+    max-height: 360px;
+    overflow-y: auto;
+}
+.autofix-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 12px;
+    padding: 5px 8px;
+    font-size: 11px;
+    border-bottom: 1px dashed var(--border);
+    align-items: baseline;
+}
+.autofix-row:last-child { border-bottom: 0; }
+.autofix-row.skip { color: #ffb86c; }
+.autofix-row.more {
+    grid-template-columns: 1fr;
+    color: var(--text-2);
+    font-style: italic;
+    padding-top: 8px;
+}
+.autofix-path {
+    font-family: var(--font-mono);
+    color: var(--text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.autofix-fixes {
+    color: var(--text-1);
+    line-height: 1.5;
+}
+.autofix-fixes code {
+    background: var(--bg-0);
+    padding: 0 4px;
+    border-radius: 2px;
+    font-size: 10px;
+}
+.autofix-modal-foot {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-2);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.poc-validate-block {
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-1);
+}
+.poc-validate-block > summary {
+    cursor: pointer;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-2);
+    user-select: none;
+}
+.poc-validate-block > summary:hover { color: var(--text-1); }
+.poc-validate-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.poc-validate-item {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.poc-validate-item:last-child { border-bottom: none; }
+.poc-validate-tag {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+.poc-validate-err .poc-validate-tag { background: rgba(248,81,73,0.2); color: #ff7b72; }
+.poc-validate-wrn .poc-validate-tag { background: rgba(210,153,34,0.2); color: #d29922; }
+.poc-validate-path {
+    flex: 0 0 auto;
+    color: var(--text-1);
+    max-width: 32%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.poc-validate-cause {
+    flex: 1;
+    color: var(--text-2);
+    word-break: break-all;
+}
+.poc-validate-raw {
+    margin: 0;
+    padding: 8px 10px;
+    max-height: 220px;
+    overflow: auto;
+    font-size: 11px;
+    color: var(--text-2);
+    background: var(--bg-0);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* ===== Nuclei Validator (独立页) ===== */
+.nuclei-validator {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+    min-height: 0;
+}
+.nuclei-validator .extractor-tip code {
+    background: var(--bg-3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+.nv-result {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    background: var(--bg-1);
+    min-height: 200px;
+}
+.nv-result:empty::before {
+    content: '验证结果会显示在这里';
+    color: var(--text-3);
+    font-size: 12px;
+}

@@ -1,0 +1,459 @@
+/* ===== 顶部拖动条 =====
+ * 覆盖窗口最顶 30px 整条横向区域, 任何位置点击空白都可以拖动窗口移动.
+ * Wails 不用标准的 -webkit-app-region, 而是检测自定义属性 --wails-draggable: drag
+ * (见 wails 源码 internal/frontend/runtime/desktop/main.js 的 dragTest).
+ * 与 main.go 里 mac.TitleBarHiddenInset() 配合: 红绿灯由 macOS 原生层渲染, 在 webview
+ * 之上, 不会被这条 drag strip 挡到. */
+.app-titlebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    z-index: 99;
+    background: transparent;
+    --wails-draggable: drag;
+}
+
+/* 交互元素一律覆盖为不拖动, 避免点击被吞.
+ * 自定义属性默认会从父元素继承, 所以必须显式设非 drag 值. */
+button,
+input,
+textarea,
+select,
+a {
+    --wails-draggable: no-drag;
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--bg-1);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: relative;   /* 让 .sidebar-resizer 相对其定位 */
+    opacity: 1;
+    transition:
+        width var(--motion-standard) var(--motion-ease-out-quart),
+        margin-left var(--motion-standard) var(--motion-ease-out-quart),
+        opacity var(--motion-fast) var(--motion-ease-out-quart),
+        background-color var(--motion-slow) var(--motion-ease-out-quart),
+        border-color var(--motion-slow) var(--motion-ease-out-quart),
+        color var(--motion-slow) var(--motion-ease-out-quart);
+}
+
+.sidebar.resizing {
+    transition: none;
+}
+
+/* 整体收起态: 宽度归零, 内容隐藏. 实际宽度走 margin-left 负值方便保留拖拽宽度记忆,
+ * 但更直接的方式是 width:0+overflow:hidden, 这里选 width 0 + 还原原 width 由 inline style 管. */
+.sidebar.hidden {
+    width: 0 !important;
+    opacity: 0;
+    border-right-color: transparent;
+    overflow: hidden;
+    pointer-events: none;
+}
+.sidebar.hidden > * {
+    opacity: 0;
+}
+
+/* 右侧拖动条: 鼠标悬停可见, 默认透明, 不挡正常点击 */
+.sidebar-resizer {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 10;
+    --wails-draggable: no-drag;
+    touch-action: none;
+    background: transparent;
+    transition: background-color var(--motion-fast) var(--motion-ease-out-quart);
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+    background: rgba(88, 166, 255, 0.35);
+}
+
+/* macOS 红绿灯按钮预留空间 (TitleBarHiddenInset) */
+.sidebar-header {
+    padding: 36px 14px 14px 18px;
+    border-bottom: 1px solid var(--border);
+    --wails-draggable: drag;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.sidebar-logo {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.sidebar-brand-text {
+    min-width: 0;
+}
+
+.sidebar-collapse {
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-2);
+    color: var(--text-2);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    transition:
+        background-color var(--motion-fast) var(--motion-ease-out-quart),
+        border-color var(--motion-fast) var(--motion-ease-out-quart),
+        color var(--motion-fast) var(--motion-ease-out-quart),
+        transform var(--motion-fast) var(--motion-ease-out-quart);
+}
+
+.sidebar-collapse:hover {
+    color: var(--text-1);
+    border-color: var(--accent);
+    background: var(--bg-3);
+}
+
+.sidebar-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-1);
+    letter-spacing: 0;
+}
+
+.sidebar-subtitle {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 3px;
+    letter-spacing: 0;
+}
+
+.module-list {
+    list-style: none;
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 8px;
+}
+
+.module-item {
+    width: 100%;
+    padding: 9px 10px;
+    cursor: pointer;
+    color: var(--text-2);
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px transparent;
+    transition:
+        background-color var(--motion-fast) var(--motion-ease-out-quart),
+        color var(--motion-fast) var(--motion-ease-out-quart),
+        box-shadow var(--motion-fast) var(--motion-ease-out-quart),
+        transform var(--motion-fast) var(--motion-ease-out-quart);
+    font-size: 13px;
+    font-family: inherit;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 3px;
+}
+
+.module-item:hover {
+    background: var(--bg-2);
+    color: var(--text-1);
+}
+
+.module-item.active {
+    background: var(--bg-2);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    font-weight: 600;
+}
+
+.module-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-0);
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.module-item.active .module-icon,
+.module-item:hover .module-icon {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.module-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.module-chevron {
+    font-size: 10px;
+    color: var(--text-3);
+    transition: transform var(--motion-standard) var(--motion-ease-out-quart);
+    flex-shrink: 0;
+}
+
+.module-block.collapsed .module-chevron {
+    transform: rotate(-90deg);
+}
+
+.module-block.collapsed .submenu {
+    display: none;
+}
+
+.submenu {
+    list-style: none;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.submenu-item {
+    padding: 8px 20px 8px 49px;
+    font-size: 12px;
+    color: var(--text-2);
+    cursor: pointer;
+    box-shadow: inset 0 0 0 1px transparent;
+    transition:
+        background-color var(--motion-fast) var(--motion-ease-out-quart),
+        color var(--motion-fast) var(--motion-ease-out-quart),
+        box-shadow var(--motion-fast) var(--motion-ease-out-quart);
+}
+
+.submenu-item:hover {
+    color: var(--text-1);
+    background: var(--bg-2);
+}
+
+.submenu-item.active {
+    color: var(--accent);
+    background: var(--bg-2);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.sidebar-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-3);
+    font-size: 11px;
+    text-align: center;
+    letter-spacing: 0;
+}
+
+/* ===== Main ===== */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.main-header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    --wails-draggable: drag;
+    /* sidebar 展开时, 红绿灯被 .sidebar-header 的 36px padding 遮住, 主区无冲突.
+     * sidebar 收起时下方 .sidebar.hidden + .main 规则会把 padding-left 加大, 让开红绿灯. */
+    transition:
+        padding-left var(--motion-standard) var(--motion-ease-out-quart),
+        background-color var(--motion-slow) var(--motion-ease-out-quart),
+        border-color var(--motion-slow) var(--motion-ease-out-quart),
+        color var(--motion-slow) var(--motion-ease-out-quart);
+}
+
+/* sidebar 整体收起时, 红绿灯 (macOS TitleBarHiddenInset 渲染在 webview 之上的
+ * 原生层) 没有 sidebar-header 可占位, 会直接盖在主区 header 的 ☰ 按钮和面包屑上.
+ * 给 main-header 加一层 padding-left 把它们挤到红绿灯右边. 78px ≈ 3 个圆点 + 边距. */
+.sidebar.hidden + .main > .main-header {
+    padding-left: 84px;
+}
+
+/* 主头部左侧的 ☰ 切换按钮 */
+.sidebar-toggle {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-2);
+    color: var(--text-2);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    --wails-draggable: no-drag;
+    transition:
+        background-color var(--motion-fast) var(--motion-ease-out-quart),
+        color var(--motion-fast) var(--motion-ease-out-quart),
+        border-color var(--motion-fast) var(--motion-ease-out-quart),
+        transform var(--motion-fast) var(--motion-ease-out-quart);
+}
+.sidebar-toggle:hover {
+    color: var(--text-1);
+    background: var(--bg-3);
+    border-color: var(--accent);
+}
+.main-header > .breadcrumb {
+    flex: 1;
+    --wails-draggable: drag;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    --wails-draggable: no-drag;
+}
+
+.theme-toggle {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-2);
+    color: var(--text-2);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    --wails-draggable: no-drag;
+    transition:
+        background-color var(--motion-fast) var(--motion-ease-out-quart),
+        color var(--motion-fast) var(--motion-ease-out-quart),
+        border-color var(--motion-fast) var(--motion-ease-out-quart),
+        transform var(--motion-fast) var(--motion-ease-out-quart);
+}
+
+.theme-toggle:hover {
+    color: var(--text-1);
+    background: var(--bg-3);
+    border-color: var(--accent);
+    transform: rotate(-12deg);
+}
+
+.theme-toggle:hover:not(:disabled):active {
+    transform: rotate(-12deg) scale(0.97);
+}
+
+.theme-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.breadcrumb {
+    font-size: 13px;
+    color: var(--text-2);
+}
+
+.breadcrumb-current {
+    color: var(--text-1);
+    font-weight: 500;
+}
+
+.main-content {
+    flex: 1;
+    padding: 18px 22px 28px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.main-content.route-entering > * {
+    animation: route-content-enter var(--motion-slow) var(--motion-ease-out-quint) backwards;
+}
+
+@keyframes route-content-enter {
+    from {
+        opacity: 0.94;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-toggle:hover,
+    .theme-toggle:hover:not(:disabled):active {
+        transform: none;
+    }
+
+    .main-content.route-entering > * {
+        animation: none;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .sidebar,
+    .main-header {
+        background-color: var(--bg-1);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+@media (prefers-contrast: more) {
+    .sidebar {
+        border-right-color: var(--text-2);
+    }
+
+    .sidebar-collapse,
+    .sidebar-toggle,
+    .theme-toggle {
+        border-color: var(--text-2);
+    }
+
+    .module-item.active {
+        box-shadow: inset 0 0 0 2px currentColor;
+    }
+}

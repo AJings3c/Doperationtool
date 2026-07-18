@@ -1,0 +1,336 @@
+/* ============================================
+ * YAML 转换模块
+ * 三栏布局: 源 / 缓冲区 / 目标
+ * ============================================ */
+
+.yaml-converter {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+}
+
+.yaml-tip {
+    font-size: 12px;
+    color: var(--text-2);
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    border-radius: 4px;
+    line-height: 1.7;
+    flex-shrink: 0;
+}
+
+.yaml-tip b {
+    color: var(--text-1);
+    font-weight: 600;
+}
+
+/* yaml-grid: 三个面板竖排 (源 → 缓冲区 → 目标), 让每个面板都有窗口全宽,
+ * 内部再用 yaml-panel-body 拆成 list-pane 左 + editor-pane 右. */
+.yaml-grid {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+}
+
+.yaml-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* 三个面板的高度分配 (展开态): 源占主要工作区, 缓冲区其次, 目标最小. */
+.yaml-panel-source { flex: 3 1 0; min-height: 280px; }
+.yaml-panel-buffer { flex: 1.6 1 0; min-height: 220px; }
+.yaml-panel-target { flex: 0 0 auto; }
+
+/* ===== POC 转换页: 三个面板 + 验证结果可能很高, 整页可上下滚动 =====
+ * 与 YAML 转换页区分: yaml 页面是 "永远塞满视口" 的工作区, POC 页面更像
+ * "工作流串起来的步骤", 内容超出视口时整体滚动比把每个面板压成几行好用. */
+.poc-converter .yaml-grid {
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* 自动按内容高度堆叠, 不再按比例瓜分视口. */
+}
+.poc-converter .yaml-panel-source {
+    flex: 0 0 auto;
+    min-height: 360px;
+}
+.poc-converter .yaml-panel-buffer {
+    flex: 0 0 auto;
+    min-height: 340px;
+}
+.poc-converter .yaml-panel-target {
+    flex: 0 0 auto;
+}
+.poc-converter .yaml-panel.collapsed {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+/* 折叠态: 只显示标题栏, 隐藏其它部分. flex 0 0 auto 让它紧贴内容高度. */
+.yaml-panel.collapsed {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+.yaml-panel.collapsed .yaml-path,
+.yaml-panel.collapsed .yaml-path-input,
+.yaml-panel.collapsed .yaml-panel-body,
+.yaml-panel.collapsed .yaml-target-summary,
+.yaml-panel.collapsed .panel-footer {
+    display: none;
+}
+
+/* 标题栏左半部分 (chevron + 名字) 整块可点击, 用于切换折叠 */
+.panel-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    --wails-draggable: no-drag;
+    flex: 1;
+    min-width: 0;
+    color: var(--text-1);
+    transition: color 0.12s ease;
+}
+.panel-header-title:hover {
+    color: var(--accent);
+}
+
+.panel-header-chevron {
+    font-size: 10px;
+    color: var(--text-3);
+    transition: transform 0.18s ease;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.yaml-panel.collapsed .panel-header-chevron {
+    transform: rotate(-90deg);
+}
+
+/* 面板正文: 横向排列, 列表在左, 编辑器在右 */
+.yaml-panel-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+}
+
+/* 左侧列表区 (含搜索栏 / 视图栏 / 树或类别) */
+.yaml-list-pane {
+    flex: 0 0 340px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+    min-height: 0;
+}
+
+/* 右侧编辑器区 (文件名 + 内容 textarea), 充分占据剩余横向空间 */
+.yaml-editor-pane {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.yaml-path {
+    padding: 6px 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-2);
+    background: rgba(0, 0, 0, 0.18);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+/* 源面板的可编辑路径栏: 平时看起来和 .yaml-path 一样 (黑底灰字, 无边框感),
+ * 聚焦时边框变 accent 蓝, 提示 "正在编辑". 用户按 Enter 加载, Escape 还原. */
+.yaml-list {
+    flex: 1 1 auto;
+    min-height: 0;       /* flex 子项 + overflow 必备 */
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.yaml-list-item {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    border-left: 2px solid transparent;
+    transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.yaml-list-item:hover {
+    background: var(--bg-2);
+    color: var(--text-1);
+}
+
+.yaml-list-item.active {
+    background: var(--bg-2);
+    color: var(--accent);
+    border-left-color: var(--accent);
+}
+
+.yaml-list-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.yaml-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--warning);
+    flex-shrink: 0;
+}
+
+.yaml-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.yaml-name {
+    margin: 8px 8px 6px;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-1);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.12s ease;
+    flex-shrink: 0;
+}
+
+.yaml-name:focus {
+    border-color: var(--accent);
+}
+
+.yaml-name:disabled {
+    color: var(--text-3);
+    background: var(--bg-1);
+}
+
+.yaml-name::placeholder {
+    color: var(--text-3);
+}
+
+.yaml-content {
+    flex: 1;
+    margin: 0 8px 8px;
+    padding: 8px 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-1);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.65;
+    resize: none;
+    outline: none;
+    min-height: 0;
+    transition: border-color 0.12s ease;
+}
+
+.yaml-content:focus {
+    border-color: var(--accent);
+}
+
+.yaml-content:disabled {
+    color: var(--text-3);
+    background: var(--bg-1);
+}
+
+.yaml-content::placeholder {
+    color: var(--text-3);
+}
+
+.yaml-target-summary {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 12px;
+    min-height: 0;
+}
+
+.yaml-target-title {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed var(--border);
+}
+
+.yaml-target-item {
+    padding: 4px 0;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 目标面板现在紧凑显示, 只放概要不再撑高 */
+.yaml-panel-target .yaml-target-summary {
+    flex: 0 0 auto;
+    max-height: 140px;
+}
+
+/* nuclei 验证结果 (输出目录面板下半区) */
+.poc-validate-result {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px 12px;
+    min-height: 0;
+    border-top: 1px dashed var(--border);
+}
+.yaml-panel.collapsed .poc-validate-result { display: none; }
+.poc-validate-actions {
+    display: flex;
+    gap: 6px;
+    margin: 6px 0 8px;
+    flex-wrap: wrap;
+}
+.btn-tiny {
+    padding: 3px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    border-radius: 3px;
+}
+.btn.btn-fix {
+    background: rgba(56, 189, 124, 0.15);
+    color: #38bd7c;
+    border-color: rgba(56, 189, 124, 0.4);
+}
+.btn.btn-fix:hover {
+    background: rgba(56, 189, 124, 0.25);
+    border-color: rgba(56, 189, 124, 0.6);
+    color: #6ce0a4;
+}

@@ -1,0 +1,107 @@
+/* Shared path inputs, compact toolbars, and asynchronous result states. */
+.yaml-path-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-1);
+    background: rgba(0, 0, 0, 0.18);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    outline: none;
+    flex-shrink: 0;
+    transition: background 0.12s ease, border-color 0.12s ease;
+    --wails-draggable: no-drag;
+}
+
+.yaml-path-input:hover {
+    background: rgba(88, 166, 255, 0.05);
+}
+
+.yaml-path-input:focus {
+    background: var(--bg-2);
+    border-bottom-color: var(--accent);
+}
+
+.yaml-path-input::placeholder {
+    color: var(--text-3);
+    opacity: 1;
+}
+
+.yaml-empty {
+    padding: 18px 14px;
+    color: var(--text-3);
+    font-size: 12px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.poc-validate-pass,
+.poc-validate-fail {
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.poc-validate-pass {
+    background: rgba(46, 160, 67, 0.12);
+    color: #56d364;
+}
+
+.poc-validate-fail {
+    background: rgba(248, 81, 73, 0.12);
+    color: #ff7b72;
+}
+
+.nv-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.nv-toolbar .yaml-path-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.nv-history {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    min-height: 0;
+}
+
+.nv-history:empty {
+    display: none;
+}
+
+.nv-hist-label {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-right: 2px;
+}
+
+.nv-hist-chip {
+    padding: 3px 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-2);
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nv-hist-chip:hover {
+    color: var(--text-1);
+    border-color: var(--accent, #58a6ff);
+    background: var(--bg-2);
+}
